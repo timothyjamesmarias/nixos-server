@@ -12,7 +12,7 @@
   };
 
   # Locale
-  time.timeZone = "America/New_York"; # TODO: your timezone
+  time.timeZone = "UTC";
   i18n.defaultLocale = "en_US.UTF-8";
 
   # Base packages
@@ -32,8 +32,7 @@
     isNormalUser = true;
     extraGroups = [ "docker" ];
     openssh.authorizedKeys.keys = [
-      # TODO: add your SSH public key(s)
-      # "ssh-ed25519 AAAA..."
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJvpe/fxnamo6zzOVoxK3WfouV1LyIrd5JCHXvfyH+v timmarias@Tims-MacBook-Pro.local"
     ];
   };
 }

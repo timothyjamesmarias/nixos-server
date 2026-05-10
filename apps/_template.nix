@@ -8,12 +8,20 @@
 #   4. Add any app-specific secrets to secrets/secrets.yaml
 #   5. Import the new file in configuration.nix
 #   6. Deploy: nixos-rebuild switch --flake /path/to/nixos#server
+#
+# Domain notes:
+#   - Each app can use any domain or subdomain you control (they don't need
+#     to share a single domain). For example, one app could be on
+#     api.foo.com and another on dashboard.bar.org.
+#   - Every domain used must have its DNS managed through Cloudflare, and
+#     the Cloudflare API token must have DNS edit permissions for all zones.
+#   - Add an A record in Cloudflare pointing the domain to your server IP.
 # ============================================================================
 { config, pkgs, lib, ... }:
 
 let
   appName  = "my-app";       # TODO: container and router name (kebab-case)
-  domain   = "my-app.example.com"; # TODO: full domain or subdomain
+  domain   = "my-app.example.com"; # TODO: any domain/subdomain you control (doesn't have to match other apps)
   imageSha = "sha256:0000000000000000000000000000000000000000000000000000000000000000"; # TODO: real image digest
   ghOrg    = "USERNAME";     # TODO: your GitHub org or username
   appPort  = "8080";         # Port the app listens on inside the container

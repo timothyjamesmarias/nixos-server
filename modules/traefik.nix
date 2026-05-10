@@ -18,7 +18,7 @@
     };
 
     certificatesResolvers.letsencrypt.acme = {
-      email = "you@example.com"; # TODO: your email
+      email = "tim@timothymarias.com";
       storage = "/acme/acme.json";
       dnsChallenge = {
         provider = "cloudflare";
@@ -88,7 +88,7 @@
       "traefik-acme:/acme"
     ];
     environment = {
-      CF_API_EMAIL = "you@example.com"; # TODO: your Cloudflare email
+      CF_API_EMAIL = "tim@timothymarias.com";
     };
     environmentFiles = [
       # Provides CF_DNS_API_TOKEN for Cloudflare DNS challenge

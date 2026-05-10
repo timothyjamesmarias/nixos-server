@@ -24,8 +24,8 @@
     ./apps/example-api.nix
   ];
 
-  networking.hostName = "server"; # TODO: pick a hostname
+  networking.hostName = "server";
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "25.05"; # TODO: match your NixOS install version
+  system.stateVersion = "25.11";
 }
