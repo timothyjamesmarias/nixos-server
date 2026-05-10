@@ -24,6 +24,9 @@
     ./apps/example-api.nix
   ];
 
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
   networking.hostName = "server";
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
