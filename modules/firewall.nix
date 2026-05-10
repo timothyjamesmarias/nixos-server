@@ -4,8 +4,7 @@
   networking.firewall = {
     enable = true;
 
-    # Public-facing: only HTTP and HTTPS
-    allowedTCPPorts = [ 80 443 ];
+    allowedTCPPorts = [ 22 80 443 ];
 
     # SSH is allowed by default when openssh is enabled.
     # To restrict SSH to specific IPs, use:
