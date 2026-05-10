@@ -18,13 +18,19 @@ let
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${pkgs.docker}/bin/docker network create ${name} || true";
-        ExecStop = "${pkgs.docker}/bin/docker network rm ${name} || true";
+        ExecStart = pkgs.writeShellScript "create-network-${name}" ''
+          ${pkgs.docker}/bin/docker network create ${name} || true
+        '';
+        ExecStop = pkgs.writeShellScript "remove-network-${name}" ''
+          ${pkgs.docker}/bin/docker network rm ${name} || true
+        '';
       };
     };
   };
 in
 {
+  virtualisation.oci-containers.backend = "docker";
+
   virtualisation.docker = {
     enable = true;
     autoPrune = {
