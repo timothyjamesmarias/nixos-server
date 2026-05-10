@@ -76,7 +76,7 @@
   };
 
   virtualisation.oci-containers.containers.traefik = {
-    image = "traefik:v3.3"; # TODO: pin to specific SHA
+    image = "traefik:v3.4";
     ports = [
       "80:80"
       "443:443"

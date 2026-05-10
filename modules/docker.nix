@@ -52,10 +52,9 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          # TODO: replace USERNAME with your GitHub username
           ExecStart = pkgs.writeShellScript "ghcr-login" ''
             ${pkgs.docker}/bin/docker login ghcr.io \
-              -u USERNAME \
+              -u timothyjamesmarias \
               --password-stdin < ${config.sops.secrets."ghcr-token".path}
           '';
         };

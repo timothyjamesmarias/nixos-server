@@ -21,7 +21,6 @@
     ./modules/backups.nix
 
     # Apps — add new app imports here
-    ./apps/example-api.nix
   ];
 
   boot.loader.systemd-boot.enable = true;
