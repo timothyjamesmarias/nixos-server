@@ -30,19 +30,11 @@
   # Deploy user — used for SSH access and managing containers
   users.users.deploy = {
     isNormalUser = true;
-    extraGroups = [ "docker" ];
+    extraGroups = [ "docker" "wheel" ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJvpe/fxnamo6zzOVoxK3WfouV1LyIrd5JCHXvfyH+v timmarias@Tims-MacBook-Pro.local"
     ];
   };
 
-  # Scoped passwordless sudo for deployment
-  security.sudo.extraRules = [{
-    users = [ "deploy" ];
-    commands = [
-      { command = "/run/current-system/sw/bin/nixos-rebuild"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/systemctl"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/docker"; options = [ "NOPASSWD" ]; }
-    ];
-  }];
+  security.sudo.wheelNeedsPassword = false;
 }
