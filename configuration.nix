@@ -15,6 +15,7 @@
     ./modules/docker.nix
     ./modules/postgresql.nix
     ./modules/traefik.nix
+    ./modules/cloudflare-ddns.nix
 
     # Observability
     ./modules/monitoring.nix
