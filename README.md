@@ -14,13 +14,15 @@ Declarative NixOS configuration for a self-hosted server running Kotlin/Ktor bac
 | **GitHub account** | Container registry for app images | [github.com](https://github.com) |
 | **GHCR personal access token** | Pulling private container images from GitHub | GitHub → Settings → Developer settings → Personal access tokens → `read:packages` scope |
 
+**Note:** You only need the Cloudflare account and API token during initial setup. You don't need to add domains or create DNS records until you're ready to deploy an app.
+
 ### On Your Local Machine
 
 | Requirement | What it's for | Install |
 |---|---|---|
 | **`sops`** | Encrypting/decrypting secrets | `brew install sops` |
 | **`age`** | Key pair for sops encryption | `brew install age` |
-| **SSH key pair** | Accessing the server | `ssh-keygen -t ed25519` (if you don't have one) |
+| **SSH key pair** | Accessing the server | `ssh-keygen -t ed25519 -f ~/.ssh/your-server-key` |
 | **Git** | Cloning/pushing this repo | `brew install git` (or Xcode CLI tools) |
 
 ### On the Server
@@ -38,17 +40,12 @@ These are the values marked `TODO` throughout the config files:
 
 | Value | Where it goes | Example |
 |---|---|---|
-| **Hostname** | `configuration.nix` | `homelab` |
-| **stateVersion** | `configuration.nix` | Check `grep stateVersion /etc/nixos/configuration.nix` on the server |
-| **Timezone** | `modules/base.nix` | `America/New_York`, `America/Los_Angeles`, etc. |
+| **stateVersion** | `configuration.nix` | Run `grep stateVersion /etc/nixos/configuration.nix` on the server |
 | **SSH public key(s)** | `modules/base.nix` | `ssh-ed25519 AAAA...` |
-| **Domain(s)** | `apps/example-api.nix`, `modules/traefik.nix`, `modules/monitoring.nix` | Each app sets its own domain — e.g. `api.foo.com`, `app.bar.org`, `grafana.foo.com` |
 | **Cloudflare email** | `modules/traefik.nix` | Your Cloudflare account email |
 | **ACME email** | `modules/traefik.nix` | Email for Let's Encrypt certificate notifications |
-| **GitHub username/org** | `modules/docker.nix`, `apps/example-api.nix` | Your GitHub username |
-| **Container image digest** | `apps/example-api.nix` | `sha256:abc123...` from your CI build |
+| **GitHub username** | `modules/docker.nix` | Your GitHub username |
 | **PostgreSQL tuning** | `modules/postgresql.nix` | `shared_buffers` = 25% of server RAM |
-| **Docker subnet** | `modules/postgresql.nix` | Verify `172.18.0.0/16` matches after Docker network creation |
 
 ### Secrets (encrypted via sops-nix)
 
@@ -87,17 +84,28 @@ sudo cat /var/lib/sops-nix/key.txt   # note the public key (age1...)
 
 ### 3. Configure sops
 
-On your local machine, update `secrets/.sops.yaml` with the server's age public key from step 2:
+On your local machine, generate a local age key so you can edit secrets from your machine:
+
+```bash
+age-keygen -o ~/Library/Application\ Support/sops/age/keys.txt
+# Note the public key (age1...)
+```
+
+Update `.sops.yaml` in the repo root with both the server's and your local age public keys:
 
 ```yaml
 keys:
-  - &server age1your-public-key-here
+  - &server age1-server-public-key-here
+  - &local age1-your-local-public-key-here
 creation_rules:
-  - path_regex: secrets\.yaml$
+  - path_regex: secrets/secrets\.yaml$
     key_groups:
       - age:
           - *server
+          - *local
 ```
+
+**Important:** `.sops.yaml` must be in the repo root, not inside `secrets/`.
 
 Then create the encrypted secrets file:
 
@@ -106,76 +114,128 @@ sops secrets/secrets.yaml
 # Fill in values per secrets.example.yaml, save and exit
 ```
 
-### 4. Fill in TODOs
+You can use `placeholder` for secrets you don't have yet (like GHCR token). The Cloudflare API token should be real if you want TLS to work.
 
-Search for `TODO` across all `.nix` files and fill in your values. The full list is in the table above under "Information You'll Need to Fill In."
+### 4. Fill in config values
+
+Search for `TODO` across all `.nix` files and fill in your values:
 
 ```bash
 grep -rn "TODO" --include="*.nix"
 ```
 
-### 5. Copy config to the server
+**Critical values to set before first rebuild:**
+
+- `configuration.nix` — `stateVersion` (must match your NixOS install)
+- `modules/base.nix` — Your SSH public key on the `deploy` user
+- `modules/traefik.nix` — Cloudflare email and ACME email
+- `modules/docker.nix` — GitHub username for GHCR login
+
+### 5. Build without applying (dry run)
+
+Before applying anything, test that the config evaluates:
 
 ```bash
-# If repo is on GitHub
-ssh user@server "git clone https://github.com/YOU/nixos-server.git /etc/nixos"
-
-# Or rsync from your local machine
-rsync -avz --exclude .git ./ user@server:/etc/nixos/
+nixos-rebuild build --flake .#server
 ```
 
-### 6. Build and apply
+**Review the config carefully before switching.** In particular, verify:
+- Port 22 is in `firewall.nix` `allowedTCPPorts` (or you will lose SSH access)
+- Your SSH key is configured on the `deploy` user
+- The `deploy` user exists and has sudo access
 
-On the server:
+### 6. Clone on the server and apply
+
+On the server, set up an SSH key for GitHub:
 
 ```bash
-cd /etc/nixos
-sudo nixos-rebuild switch --flake .#server
+ssh-keygen -t ed25519
+cat ~/.ssh/id_ed25519.pub
+# Add this to GitHub → Settings → SSH keys
+```
+
+Clone and apply:
+
+```bash
+git clone git@github.com:YOU/nixos-server.git ~/nixos-server
+sudo ln -sfn ~/nixos-server /etc/nixos/nixos-server
+sudo nixos-rebuild switch --flake ~/nixos-server#server
 ```
 
 ### 7. Verify
 
 ```bash
+# Core services
 systemctl status docker
 systemctl status postgresql
-systemctl status traefik
-ssh deploy@<server-ip>   # test key-based login as the deploy user
+systemctl status pgbouncer
+sudo docker ps  # should show traefik + monitoring containers
+
+# SSH still works (test from local machine!)
+ssh -i ~/.ssh/your-server-key deploy@<server-ip>
+
+# Check for failures
+sudo systemctl --failed
 ```
+
+### 8. Set a static IP
+
+Add to `configuration.nix` (replace values for your network):
+
+```nix
+networking.interfaces.enp86s0.ipv4.addresses = [{
+  address = "192.168.1.7";
+  prefixLength = 24;
+}];
+networking.defaultGateway = "192.168.1.1";
+networking.nameservers = [ "1.1.1.1" "8.8.8.8" ];
+```
+
+Find your interface name with `ip route show default` on the server.
+
+### 9. Port forwarding and Cloudflare (when ready for public access)
+
+1. Forward TCP 80 and 443 on your router to the server's static IP
+2. Add your domain to Cloudflare, update nameservers at your registrar
+3. Create A records pointing your app domains to your public IP
+4. Traefik handles TLS automatically via DNS challenge
 
 ## Architecture
 
 ```
 Internet → Cloudflare (DNS / DDoS / WAF — one or more domains)
-  │
-  └─ NixOS Host (firewall: 80/443 only)
-      │
-      ├─ Traefik (reverse proxy, auto TLS via DNS challenge per domain)
-      │    ├─ api.foo.com          → app-one:8080
-      │    ├─ dashboard.bar.org    → app-two:8080
-      │    └─ grafana.foo.com      → grafana:3000
-      │
-      ├─ App containers (isolated Docker networks)
-      │    └─ GraalVM native images pulled from GHCR
-      │
-      ├─ PostgreSQL (NixOS-managed, single instance)
-      │    ├─ PgBouncer (transaction-mode connection pooling)
-      │    └─ One database + user per app, scoped pg_hba.conf
-      │
-      └─ Monitoring
-           ├─ Prometheus (metrics)
-           ├─ Grafana (dashboards)
-           ├─ Loki (logs)
-           └─ OTel Collector (receives OTLP from apps)
+  |
+  └─ Router (port forward 80/443)
+      |
+      └─ NixOS Host (firewall: 22/80/443, Docker→LAN blocked)
+          |
+          ├─ Traefik (reverse proxy, auto TLS via DNS challenge per domain)
+          |    ├─ api.foo.com          → app-one:8080
+          |    ├─ dashboard.bar.org    → app-two:8080
+          |    └─ grafana.foo.com      → grafana:3000
+          |
+          ├─ App containers (isolated Docker networks)
+          |    └─ GraalVM native images pulled from GHCR
+          |
+          ├─ PostgreSQL (NixOS-managed, single instance)
+          |    ├─ PgBouncer (connection pooling, bound to localhost + Docker bridge)
+          |    └─ One database + user per app, scoped pg_hba.conf
+          |
+          └─ Monitoring (internal network, no internet access)
+               ├─ Prometheus (metrics)
+               ├─ Grafana (dashboards)
+               ├─ Loki (logs)
+               └─ OTel Collector (receives OTLP from apps)
 ```
 
 ### Network Isolation
 
-Each app container connects to `proxy-net` (so Traefik can route to it) and reaches PostgreSQL via `host.docker.internal`. Apps cannot communicate with each other.
+Each app container connects to `proxy-net` (so Traefik can route to it) and reaches PostgreSQL via `host.docker.internal:6432` (PgBouncer). Apps cannot communicate with each other. Docker containers are blocked from reaching the home LAN via iptables rules.
 
 ```
-proxy-net        ← Traefik + all app containers
-postgres-net     ← (reserved, exporters)
-monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector, exporters
+proxy-net        ← Traefik + all app containers (has internet access)
+postgres-net     ← Reserved for exporters (internal, no internet)
+monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector (internal, no internet)
 ```
 
 ## Adding a New App
@@ -186,11 +246,11 @@ monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector, exporters
 4. Import the new file in `configuration.nix`
 5. Add any secrets to `secrets/secrets.yaml` and declare in `modules/secrets.nix`
 6. If using a new domain (not just a new subdomain of an existing one), add the domain to Cloudflare and ensure the API token has DNS edit access for it
-7. Add an A record in Cloudflare pointing the domain to your server's IP
+7. Add an A record in Cloudflare pointing the domain to your server's public IP
 8. Deploy:
 
 ```bash
-sudo nixos-rebuild switch --flake .#server
+cd ~/nixos-server && sudo nixos-rebuild switch --flake ~/nixos-server#server
 ```
 
 ## Operations
@@ -202,7 +262,7 @@ sudo nixos-rebuild switch --flake .#server
 ./scripts/deploy.sh <app-name> <sha256:digest>
 
 # Manual: edit the imageSha in apps/<name>.nix, then rebuild
-sudo nixos-rebuild switch --flake .#server
+sudo nixos-rebuild switch --flake ~/nixos-server#server
 
 # Rollback
 sudo nixos-rebuild switch --rollback
@@ -236,7 +296,7 @@ Stored in `/var/backups/`.
 ### Monitoring
 
 - **Grafana** at `grafana.yourdomain.com` — dashboards for system and app metrics
-- **Prometheus** — scrapes node-exporter, postgres-exporter, Traefik
+- **Prometheus** — scrapes node-exporter, postgres-exporter, Traefik (metrics on internal port 8082)
 - **Loki** — aggregated container and system logs
 - **OTel Collector** — receives OTLP telemetry from app containers
 
@@ -255,35 +315,38 @@ systemctl status postgresql
 systemctl status pgbouncer
 
 # Rebuild errors
-nixos-rebuild build --flake .#server   # build without applying
+nixos-rebuild build --flake ~/nixos-server#server   # build without applying
+
+# Check all failed services
+sudo systemctl --failed
 ```
 
 ## File Structure
 
 ```
 ├── flake.nix                   Flake entry point (inputs + outputs)
-├── configuration.nix           Top-level imports
-├── hardware-configuration.nix  Hardware-specific config (generated)
+├── flake.lock                  Pinned dependency versions
+├── .sops.yaml                  Age key config for sops (must be in repo root)
+├── configuration.nix           Top-level imports + bootloader + static IP
+├── hardware-configuration.nix  Hardware-specific config (generated on server)
 ├── modules/
-│   ├── base.nix                Users, locale, base packages
+│   ├── base.nix                Users, locale, base packages, sudo rules
 │   ├── ssh.nix                 SSH hardening + fail2ban
-│   ├── firewall.nix            iptables rules
+│   ├── firewall.nix            iptables rules + Docker→LAN isolation
 │   ├── hardening.nix           Kernel sysctl + module blacklist
-│   ├── docker.nix              Docker daemon + shared networks
+│   ├── docker.nix              Docker daemon + shared networks (internal/external)
 │   ├── postgresql.nix          PostgreSQL + PgBouncer + app DB registry
 │   ├── traefik.nix             Reverse proxy + TLS + ForwardAuth
 │   ├── monitoring.nix          Prometheus, Grafana, Loki, OTel, exporters
 │   ├── backups.nix             Scheduled pg_dump + volume backups
 │   └── secrets.nix             sops-nix secret declarations
 ├── apps/
-│   ├── _template.nix           Copy this for new apps
-│   └── example-api.nix         Working example
+│   └── _template.nix           Copy this for new apps
 ├── scripts/
 │   ├── deploy.sh               Update image SHA + rebuild
 │   ├── db-create.sh            Create app database + user
 │   └── backup-restore.sh       List and restore backups
 └── secrets/
-    ├── .sops.yaml              Age key config for sops
     └── secrets.example.yaml    Template for secrets.yaml
 ```
 
@@ -291,13 +354,16 @@ nixos-rebuild build --flake .#server   # build without applying
 
 ```
 Layer 0  Cloudflare        DDoS protection, WAF, bot filtering
-Layer 1  NixOS firewall    Only TCP 80/443 open to the world
-Layer 2  SSH               Key-only auth, fail2ban (3 retries, 1h ban)
-Layer 3  Kernel            sysctl hardening (syncookies, no redirects, rp_filter)
-Layer 4  Traefik           TLS termination, HSTS, rate limiting, ForwardAuth
-Layer 5  Auth service      JWT validation via Traefik ForwardAuth middleware
-Layer 6  App-level         Authorization logic in your Kotlin code
-Layer 7  PostgreSQL        Per-app user, scoped pg_hba.conf, no cross-db access
-Layer 8  Docker networks   Apps isolated from each other
-Layer 9  Secrets           Encrypted at rest via sops-nix (age), decrypted at boot
+Layer 1  Router            Port forward only 80/443 to the server
+Layer 2  NixOS firewall    TCP 22/80/443 open, Docker→LAN traffic blocked
+Layer 3  SSH               Key-only auth, no root login, fail2ban (3 retries, 1h ban)
+Layer 4  Kernel            sysctl hardening (syncookies, no redirects, rp_filter)
+Layer 5  Traefik           TLS termination, HSTS, rate limiting, ForwardAuth
+Layer 6  Docker networks   Apps isolated from each other, monitoring on internal network
+Layer 7  Auth service      JWT validation via Traefik ForwardAuth middleware
+Layer 8  App-level         Authorization logic in your Kotlin code
+Layer 9  PostgreSQL        Per-app user, scoped pg_hba.conf, no cross-db access
+Layer 10 PgBouncer         Bound to localhost + Docker bridge only
+Layer 11 Secrets           Encrypted at rest via sops-nix (age), decrypted at boot
+Layer 12 Metrics           Prometheus endpoint on internal port only, not publicly accessible
 ```
