@@ -8,8 +8,9 @@ Declarative NixOS configuration for a self-hosted server running Kotlin/Ktor bac
 
 | Requirement | What it's for | Where to get it |
 |---|---|---|
-| **Cloudflare account** | DNS management, TLS certificates, DDoS protection | [cloudflare.com](https://cloudflare.com) |
-| **Cloudflare API token** | Traefik uses this to issue TLS certs via DNS challenge | Cloudflare dashboard → My Profile → API Tokens → Create Token → Zone:DNS:Edit (scope to **All Zones** if using multiple domains) |
+| **Cloudflare account** | DNS management, DDoS protection, TLS termination | [cloudflare.com](https://cloudflare.com) |
+| **Cloudflare API token** | DDNS updates + DNS challenge for Let's Encrypt (non-proxied domains) | Cloudflare dashboard → My Profile → API Tokens → Create Token → Zone:DNS:Edit (scope to **All Zones** if using multiple domains) |
+| **Cloudflare Origin CA cert** | TLS between Cloudflare and your server for proxied domains | Cloudflare → SSL/TLS → Origin Server → Create Certificate |
 | **Domain name(s)** | Routed through Cloudflare to your server. Each app can use a different domain — they don't need to share one. | Any registrar, then add each domain to Cloudflare |
 | **GitHub account** | Container registry for app images | [github.com](https://github.com) |
 | **GHCR personal access token** | Pulling private container images from GitHub | GitHub → Settings → Developer settings → Personal access tokens → `read:packages` scope |
@@ -54,7 +55,9 @@ These go in `secrets/secrets.yaml` (encrypted). See `secrets/secrets.example.yam
 | Secret | What it's for | How to get it |
 |---|---|---|
 | **`ghcr-token`** | Pulling private images from GitHub Container Registry | GitHub → Settings → Developer settings → Personal access tokens → `read:packages` |
-| **`cloudflare-api-token`** | Traefik DNS challenge for TLS certs | Cloudflare → My Profile → API Tokens → Zone:DNS:Edit (use **All Zones** for multi-domain setups) |
+| **`cloudflare-api-token`** | DDNS updates + DNS challenge for TLS certs | Cloudflare → My Profile → API Tokens → Zone:DNS:Edit (use **All Zones** for multi-domain setups) |
+| **`origin-cert-pem`** | Cloudflare Origin CA certificate (public) | Cloudflare → SSL/TLS → Origin Server → Create Certificate |
+| **`origin-cert-key`** | Cloudflare Origin CA private key | Generated with the cert above — save it, Cloudflare won't show it again |
 | **`grafana-admin-password`** | Grafana web UI login | Choose a password |
 | **`postgres-exporter-dsn`** | Prometheus monitoring of PostgreSQL | `postgresql://postgres_exporter:<password>@localhost:5432/postgres?sslmode=disable` |
 | **`auth-service/jwt-secret`** | JWT signing for the auth ForwardAuth service | Generate with `openssl rand -hex 32` |
@@ -193,24 +196,38 @@ networking.nameservers = [ "1.1.1.1" "8.8.8.8" ];
 
 Find your interface name with `ip route show default` on the server.
 
-### 9. Port forwarding and Cloudflare (when ready for public access)
+### 9. Port forwarding
 
-1. Forward TCP 80 and 443 on your router to the server's static IP
-2. Add your domain to Cloudflare, update nameservers at your registrar
-3. Create A records pointing your app domains to your public IP
-4. Traefik handles TLS automatically via DNS challenge
+Forward TCP 80 and 443 on your router to the server's static IP. On Netgear routers, this is under Advanced → Advanced Setup → Port Forwarding. You may need to access the full admin UI at `http://192.168.1.1/start.htm` if the basic UI doesn't show port forwarding options.
+
+### 10. Cloudflare setup
+
+1. Add your domain to Cloudflare, update nameservers at your registrar
+2. Set SSL/TLS mode to **Full (strict)**
+3. Generate an Origin CA certificate: SSL/TLS → Origin Server → Create Certificate
+   - Cover `*.yourdomain.com` and `yourdomain.com`
+   - Save both the cert and private key — add them to `secrets/secrets.yaml` as `origin-cert-pem` and `origin-cert-key` (use YAML `|` block syntax for multi-line values)
+4. Create A records pointing your app subdomains to your public IP, with **Proxied** (orange cloud) enabled
+5. The DDNS service (`cloudflare-ddns.nix`) automatically updates A records every 5 minutes if your public IP changes — add entries to the `dnsRecords` list for each subdomain
+
+### 11. Verify public access
+
+```bash
+curl -s https://your-subdomain.yourdomain.com
+# Should return 404 (no apps deployed) — confirms Cloudflare → Traefik is working
+```
 
 ## Architecture
 
 ```
-Internet → Cloudflare (DNS / DDoS / WAF — one or more domains)
+Internet → Cloudflare (proxy / DDoS / WAF — terminates public TLS)
   |
   └─ Router (port forward 80/443)
       |
       └─ NixOS Host (firewall: 22/80/443, Docker→LAN blocked)
           |
-          ├─ Traefik (reverse proxy, auto TLS via DNS challenge per domain)
-          |    ├─ api.foo.com          → app-one:8080
+          ├─ Traefik (reverse proxy, origin TLS via Cloudflare Origin CA cert)
+          |    ├─ app.foo.com          → app-one:8080
           |    ├─ dashboard.bar.org    → app-two:8080
           |    └─ grafana.foo.com      → grafana:3000
           |
@@ -245,8 +262,13 @@ monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector (internal, no int
 3. Add database entry to the `appDatabases` list in `modules/postgresql.nix`
 4. Import the new file in `configuration.nix`
 5. Add any secrets to `secrets/secrets.yaml` and declare in `modules/secrets.nix`
-6. If using a new domain (not just a new subdomain of an existing one), add the domain to Cloudflare and ensure the API token has DNS edit access for it
-7. Add an A record in Cloudflare pointing the domain to your server's public IP
+6. If using a new domain (not just a new subdomain of an existing one):
+   - Add the domain to Cloudflare and update nameservers at the registrar
+   - Generate a new Origin CA cert covering the domain, add to secrets
+   - Add the cert to `traefik.nix` dynamic config `tls.certificates` list
+   - Ensure the API token has DNS edit access for the new zone
+7. Create an A record in Cloudflare (Proxied/orange cloud) pointing the subdomain to your server's public IP
+8. Add the subdomain to the `dnsRecords` list in `cloudflare-ddns.nix` for automatic IP updates
 8. Deploy:
 
 ```bash
@@ -336,7 +358,8 @@ sudo systemctl --failed
 │   ├── hardening.nix           Kernel sysctl + module blacklist
 │   ├── docker.nix              Docker daemon + shared networks (internal/external)
 │   ├── postgresql.nix          PostgreSQL + PgBouncer + app DB registry
-│   ├── traefik.nix             Reverse proxy + TLS + ForwardAuth
+│   ├── traefik.nix             Reverse proxy + Origin CA TLS + ForwardAuth
+│   ├── cloudflare-ddns.nix     Automatic public IP → Cloudflare DNS updates
 │   ├── monitoring.nix          Prometheus, Grafana, Loki, OTel, exporters
 │   ├── backups.nix             Scheduled pg_dump + volume backups
 │   └── secrets.nix             sops-nix secret declarations
@@ -353,17 +376,18 @@ sudo systemctl --failed
 ## Security
 
 ```
-Layer 0  Cloudflare        DDoS protection, WAF, bot filtering
+Layer 0  Cloudflare        Proxied mode — DDoS absorption, WAF, bot filtering, public TLS termination
 Layer 1  Router            Port forward only 80/443 to the server
-Layer 2  NixOS firewall    TCP 22/80/443 open, Docker→LAN traffic blocked
+Layer 2  NixOS firewall    TCP 22/80/443 open, Docker→LAN traffic blocked (new connections only)
 Layer 3  SSH               Key-only auth, no root login, fail2ban (3 retries, 1h ban)
 Layer 4  Kernel            sysctl hardening (syncookies, no redirects, rp_filter)
-Layer 5  Traefik           TLS termination, HSTS, rate limiting, ForwardAuth
-Layer 6  Docker networks   Apps isolated from each other, monitoring on internal network
+Layer 5  Traefik           Origin CA TLS (Cloudflare ↔ server), HSTS, rate limiting, ForwardAuth
+Layer 6  Docker networks   Apps isolated from each other
 Layer 7  Auth service      JWT validation via Traefik ForwardAuth middleware
 Layer 8  App-level         Authorization logic in your Kotlin code
 Layer 9  PostgreSQL        Per-app user, scoped pg_hba.conf, no cross-db access
 Layer 10 PgBouncer         Bound to localhost + Docker bridge only
 Layer 11 Secrets           Encrypted at rest via sops-nix (age), decrypted at boot
 Layer 12 Metrics           Prometheus endpoint on internal port only, not publicly accessible
+Layer 13 DDNS              Auto-updates Cloudflare A records every 5 minutes if public IP changes
 ```

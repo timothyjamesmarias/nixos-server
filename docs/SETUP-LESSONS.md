@@ -168,3 +168,62 @@ nixos-rebuild build --flake ~/nixos-server#server
 # Rebuild and switch
 cd ~/nixos-server && git pull && sudo nixos-rebuild switch --flake ~/nixos-server#server
 ```
+
+## Traefik Docker API version mismatch
+
+Traefik v3.3 and v3.4 hardcode Docker API version 1.24, which is rejected by Docker Engine 29+ (minimum API 1.40). The `DOCKER_API_VERSION` environment variable does NOT work — Traefik ignores it.
+
+**Fix:** Use Traefik v3.6+, which has automatic Docker API version negotiation.
+
+## Cloudflare proxy mode vs DNS only
+
+There are two ways to use Cloudflare:
+
+- **DNS only (gray cloud):** Cloudflare just resolves DNS. Traffic goes directly to your server. Traefik handles TLS with Let's Encrypt certs via DNS challenge. Your server's IP is exposed.
+
+- **Proxied (orange cloud):** Cloudflare terminates public TLS, proxies traffic to your server, and provides DDoS protection. Your server uses a Cloudflare Origin CA certificate for the Cloudflare-to-server connection. Your server's IP is hidden.
+
+This config uses **proxied mode** for DDoS protection. Key setup:
+1. Generate an Origin CA cert in Cloudflare (SSL/TLS → Origin Server)
+2. Store cert + key in sops secrets as `origin-cert-pem` and `origin-cert-key`
+3. Set Cloudflare SSL/TLS mode to **Full (strict)**
+4. A records must be set to **Proxied** (orange cloud)
+
+The Let's Encrypt / ACME config is kept as a fallback for domains not behind Cloudflare proxy.
+
+## Docker iptables rules and port forwarding
+
+Docker uses iptables NAT (PREROUTING → DNAT) to forward published ports to containers. This means:
+
+1. Traffic to published ports (80, 443) does NOT go through the INPUT chain — it goes through FORWARD
+2. Custom iptables rules that DROP traffic from Docker subnets (`172.16.0.0/12`) in FORWARD will also block **response** packets from containers back to clients
+3. Always use `--ctstate NEW` on DROP rules and add matching `ESTABLISHED,RELATED` ACCEPT rules
+
+Bad (blocks all traffic including responses):
+```bash
+iptables -I FORWARD -s 172.16.0.0/12 -d 192.168.0.0/16 -j DROP
+```
+
+Good (only blocks containers from initiating connections to LAN):
+```bash
+iptables -I FORWARD -s 172.16.0.0/12 -d 192.168.0.0/16 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -I FORWARD -s 172.16.0.0/12 -d 192.168.0.0/16 -m conntrack --ctstate NEW -j DROP
+```
+
+Also: `iptables -I` inserts at position 1. If you run multiple `-I` commands, the **last** one ends up at position 1. Reverse the order of your `-I` calls so the final rule order is correct.
+
+## Docker `--internal` networks break port forwarding
+
+Docker's `--internal` flag on networks adds rules to a `DOCKER-INTERNAL` iptables chain that drops traffic not within that network's subnet. These rules are **global** — they affect forwarded traffic to ALL containers, not just those on the internal network. This will break Traefik's published ports.
+
+**Fix:** Don't use `--internal` networks. Use iptables rules in `firewall.nix` to restrict container traffic instead.
+
+## Residential IP and DDNS
+
+Residential ISPs assign dynamic IPs via DHCP. The `cloudflare-ddns.nix` module checks the public IP every 5 minutes and updates Cloudflare A records if it changes. Add new subdomains to the `dnsRecords` list in that file.
+
+## Netgear router quirks
+
+The basic Netgear router UI may not show port forwarding options. Access the full admin UI at `http://192.168.1.1/start.htm` to see the Advanced tab with Port Forwarding under Advanced Setup.
+
+The "Add Custom Service" button may not work (popup blocker or JavaScript issue). Workaround: add a built-in service type (like FTP), then edit it to change the name and port numbers.
