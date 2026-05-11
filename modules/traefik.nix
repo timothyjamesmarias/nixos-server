@@ -92,6 +92,7 @@
     ];
     environment = {
       CF_API_EMAIL = "tim@timothymarias.com";
+      DOCKER_API_VERSION = "1.40";
     };
     environmentFiles = [
       "/run/traefik/env"
