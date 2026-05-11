@@ -79,7 +79,7 @@
   };
 
   virtualisation.oci-containers.containers.traefik = {
-    image = "traefik:v3.4";
+    image = "traefik:v3.6";
     ports = [
       "80:80"
       "443:443"
@@ -92,7 +92,7 @@
     ];
     environment = {
       CF_API_EMAIL = "tim@timothymarias.com";
-      DOCKER_API_VERSION = "1.40";
+
     };
     environmentFiles = [
       "/run/traefik/env"
