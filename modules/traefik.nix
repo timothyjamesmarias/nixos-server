@@ -32,9 +32,12 @@
       network = "proxy-net";
     };
 
-    # Metrics endpoint for Prometheus
+    # Metrics endpoint — internal only, not exposed publicly
+    entryPoints.metrics = {
+      address = ":8082";
+    };
     metrics.prometheus = {
-      entryPoint = "websecure";
+      entryPoint = "metrics";
     };
 
     log.level = "WARN";
@@ -91,8 +94,7 @@
       CF_API_EMAIL = "tim@timothymarias.com";
     };
     environmentFiles = [
-      # Provides CF_DNS_API_TOKEN for Cloudflare DNS challenge
-      # Create this file from the sops secret
+      "/run/traefik/env"
     ];
     extraOptions = [
       "--network=proxy-net"

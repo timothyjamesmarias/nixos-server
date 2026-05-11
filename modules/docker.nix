@@ -2,27 +2,28 @@
 
 let
   # Docker networks shared across the stack
+  # internal = true means no outbound internet access from that network
   networks = [
-    "proxy-net"      # Traefik <-> app containers
-    "postgres-net"   # App containers <-> PostgreSQL/PgBouncer
-    "monitoring-net" # Monitoring stack internal communication
+    { name = "proxy-net";      internal = false; } # Traefik <-> app containers (needs internet for ACME)
+    { name = "postgres-net";   internal = true; }  # Reserved for exporters
+    { name = "monitoring-net"; internal = true; }   # Monitoring stack internal communication
   ];
 
   # Generate a systemd oneshot service that creates a Docker network if it doesn't exist
-  mkNetworkService = name: {
-    "docker-network-${name}" = {
-      description = "Create Docker network ${name}";
+  mkNetworkService = net: {
+    "docker-network-${net.name}" = {
+      description = "Create Docker network ${net.name}";
       after = [ "docker.service" ];
       requires = [ "docker.service" ];
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = pkgs.writeShellScript "create-network-${name}" ''
-          ${pkgs.docker}/bin/docker network create ${name} || true
+        ExecStart = pkgs.writeShellScript "create-network-${net.name}" ''
+          ${pkgs.docker}/bin/docker network create ${lib.optionalString net.internal "--internal"} ${net.name} || true
         '';
-        ExecStop = pkgs.writeShellScript "remove-network-${name}" ''
-          ${pkgs.docker}/bin/docker network rm ${name} || true
+        ExecStop = pkgs.writeShellScript "remove-network-${net.name}" ''
+          ${pkgs.docker}/bin/docker network rm ${net.name} || true
         '';
       };
     };

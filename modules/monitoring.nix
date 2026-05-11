@@ -189,34 +189,47 @@
     };
 
     node-exporter = {
-      image = "prom/node-exporter:v1.9.0"; # TODO: pin SHA
+      image = "prom/node-exporter:v1.9.0";
       volumes = [
         "/proc:/host/proc:ro"
         "/sys:/host/sys:ro"
-        "/:/rootfs:ro"
       ];
       cmd = [
         "--path.procfs=/host/proc"
         "--path.sysfs=/host/sys"
-        "--path.rootfs=/rootfs"
-        "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+        "--no-collector.filesystem"
       ];
       extraOptions = [
         "--network=monitoring-net"
-        "--pid=host"
       ];
     };
 
     postgres-exporter = {
-      image = "prometheuscommunity/postgres-exporter:v0.16.0"; # TODO: pin SHA
-      environment = {
-        # TODO: set DATA_SOURCE_NAME via environmentFiles from sops secret
-        DATA_SOURCE_NAME = "postgresql://postgres_exporter:changeme@host.docker.internal:5432/postgres?sslmode=disable";
-      };
+      image = "prometheuscommunity/postgres-exporter:v0.16.0";
+      environmentFiles = [
+        "/run/postgres-exporter/env"
+      ];
       extraOptions = [
         "--network=monitoring-net"
         "--add-host=host.docker.internal:host-gateway"
       ];
+    };
+  };
+
+  # Generate postgres-exporter env file from sops secret
+  systemd.services.postgres-exporter-env = {
+    description = "Generate postgres-exporter environment file from secrets";
+    after = [ "sops-nix.service" ];
+    before = [ "docker-postgres-exporter.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "postgres-exporter-env" ''
+        mkdir -p /run/postgres-exporter
+        echo "DATA_SOURCE_NAME=$(cat ${config.sops.secrets."postgres-exporter-dsn".path})" > /run/postgres-exporter/env
+        chmod 600 /run/postgres-exporter/env
+      '';
     };
   };
 

@@ -4,7 +4,7 @@ let
   backupDir = "/var/backups";
 
   # Databases to back up — keep in sync with postgresql.nix appDatabases
-  databases = [ "example_api" ]; # TODO: add database names as you add apps
+  databases = []; # Add database names as you add apps
 
   pgBackupScript = pkgs.writeShellScript "pg-backup" ''
     set -euo pipefail

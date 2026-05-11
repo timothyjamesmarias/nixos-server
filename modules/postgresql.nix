@@ -4,8 +4,7 @@ let
   # Central app database registry.
   # Add one entry per app. Each gets a dedicated database + user.
   appDatabases = [
-    { name = "example-api"; user = "example_api"; dbName = "example_api"; }
-    # { name = "my-app";     user = "my_app";     dbName = "my_app"; }
+    # { name = "my-app"; user = "my_app"; dbName = "my_app"; }
   ];
 
   # Docker bridge subnet — containers connect from this range.
@@ -79,13 +78,11 @@ in
         default_pool_size = 20;
         min_pool_size = 5;
 
-        # Listen on all interfaces so Docker containers can reach it.
-        # Firewall restricts external access — only Docker bridge subnet connects here.
-        listen_addr = "0.0.0.0";
+        listen_addr = "127.0.0.1,172.17.0.1";
         listen_port = 6432;
 
         auth_type = "scram-sha-256";
-        auth_file = "/etc/pgbouncer/userlist.txt";
+        auth_query = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1";
       };
 
       databases = lib.listToAttrs (map (app: {
@@ -95,14 +92,4 @@ in
     };
   };
 
-  # PgBouncer auth file — generated from app database list.
-  # Passwords must be set manually after first deploy:
-  #   sudo -u postgres psql -c "ALTER USER example_api PASSWORD 'secret';"
-  # Then add the scram hash to this file, or switch to auth_query.
-  environment.etc."pgbouncer/userlist.txt" = {
-    text = lib.concatMapStringsSep "\n" (app:
-      ''"${app.user}" ""'' # TODO: populate with SCRAM hashes after setting passwords
-    ) appDatabases;
-    mode = "0640";
-  };
 }

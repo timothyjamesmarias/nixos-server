@@ -6,7 +6,7 @@
     settings = {
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
-      PermitRootLogin = "prohibit-password";
+      PermitRootLogin = "no";
       X11Forwarding = false;
       MaxAuthTries = 3;
     };
