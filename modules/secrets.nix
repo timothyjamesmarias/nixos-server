@@ -40,6 +40,7 @@
       "origin-cert-key" = {
         owner = "root";
       };
-    };
+
+};
   };
 }

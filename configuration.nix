@@ -21,6 +21,9 @@
     ./modules/monitoring.nix
     ./modules/backups.nix
 
+    # Hardware
+    ./modules/ups.nix  # disabled by default; enable with services.ups.enable = true
+
     # Apps — add new app imports here
   ];
 
