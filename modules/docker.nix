@@ -3,10 +3,12 @@
 let
   # Docker networks shared across the stack
   # internal = true means no outbound internet access from that network
+  # All networks use default (bridge) mode.
+  # Docker→LAN isolation is handled by iptables rules in firewall.nix.
   networks = [
-    { name = "proxy-net";      internal = false; } # Traefik <-> app containers (needs internet for ACME)
-    { name = "postgres-net";   internal = true; }  # Reserved for exporters
-    { name = "monitoring-net"; internal = true; }   # Monitoring stack internal communication
+    { name = "proxy-net";      internal = false; }
+    { name = "postgres-net";   internal = false; }
+    { name = "monitoring-net"; internal = false; }
   ];
 
   # Generate a systemd oneshot service that creates a Docker network if it doesn't exist
