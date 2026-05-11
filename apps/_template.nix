@@ -55,7 +55,9 @@ in
       "traefik.enable" = "true";
       "traefik.http.routers.${appName}.rule" = "Host(`${domain}`)";
       "traefik.http.routers.${appName}.entrypoints" = "websecure";
-      "traefik.http.routers.${appName}.tls.certresolver" = "letsencrypt";
+      "traefik.http.routers.${appName}.tls" = "true";
+      # For domains NOT behind Cloudflare proxy, use Let's Encrypt instead:
+      # "traefik.http.routers.${appName}.tls.certresolver" = "letsencrypt";
       "traefik.http.routers.${appName}.middlewares" = "forward-auth@file,rate-limit@file,secure-headers@file";
       "traefik.http.services.${appName}.loadbalancer.server.port" = appPort;
     };

@@ -13,7 +13,6 @@
       };
       websecure = {
         address = ":443";
-        http.tls.certResolver = "letsencrypt";
       };
     };
 
@@ -46,6 +45,14 @@
 
   # Traefik dynamic configuration — middlewares available to all routers
   environment.etc."traefik/dynamic.yml".text = builtins.toJSON {
+    # Cloudflare Origin CA certificate for proxied domains
+    tls.certificates = [
+      {
+        certFile = "/certs/timothymarias.com.pem";
+        keyFile = "/certs/timothymarias.com.key";
+      }
+    ];
+
     http.middlewares = {
       rate-limit = {
         rateLimit = {
@@ -88,6 +95,7 @@
       "/var/run/docker.sock:/var/run/docker.sock:ro"
       "/etc/traefik/traefik.yml:/traefik.yml:ro"
       "/etc/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"
+      "/run/traefik/certs:/certs:ro"
       "traefik-acme:/acme"
     ];
     environment = {
@@ -125,9 +133,13 @@
       Type = "oneshot";
       RemainAfterExit = true;
       ExecStart = pkgs.writeShellScript "traefik-env" ''
-        mkdir -p /run/traefik
+        mkdir -p /run/traefik/certs
         echo "CF_DNS_API_TOKEN=$(cat ${config.sops.secrets."cloudflare-api-token".path})" > /run/traefik/env
         chmod 600 /run/traefik/env
+        cp ${config.sops.secrets."origin-cert-pem".path} /run/traefik/certs/timothymarias.com.pem
+        cp ${config.sops.secrets."origin-cert-key".path} /run/traefik/certs/timothymarias.com.key
+        chmod 644 /run/traefik/certs/timothymarias.com.pem
+        chmod 600 /run/traefik/certs/timothymarias.com.key
       '';
     };
   };

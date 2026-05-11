@@ -32,6 +32,14 @@
       "auth-service/jwt-secret" = {
         owner = "root";
       };
+
+      "origin-cert-pem" = {
+        owner = "root";
+      };
+
+      "origin-cert-key" = {
+        owner = "root";
+      };
     };
   };
 }
