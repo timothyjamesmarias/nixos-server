@@ -13,14 +13,16 @@
       iptables -C FORWARD -s 172.16.0.0/12 -d 192.168.0.0/16 -j DROP 2>/dev/null || \
         iptables -I FORWARD -s 172.16.0.0/12 -d 192.168.0.0/16 -j DROP
 
-      iptables -C INPUT -s 172.16.0.0/12 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-        iptables -I INPUT -s 172.16.0.0/12 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+      # Order matters: -I inserts at position 1, so the last -I ends up first.
+      # Final order: ESTABLISHED → PgBouncer → DROP
+      iptables -C INPUT -s 172.16.0.0/12 -p tcp -j DROP 2>/dev/null || \
+        iptables -I INPUT -s 172.16.0.0/12 -p tcp -j DROP
 
       iptables -C INPUT -s 172.16.0.0/12 -p tcp --dport 6432 -j ACCEPT 2>/dev/null || \
         iptables -I INPUT -s 172.16.0.0/12 -p tcp --dport 6432 -j ACCEPT
 
-      iptables -C INPUT -s 172.16.0.0/12 -p tcp -j DROP 2>/dev/null || \
-        iptables -I INPUT -s 172.16.0.0/12 -p tcp -j DROP
+      iptables -C INPUT -s 172.16.0.0/12 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+        iptables -I INPUT -s 172.16.0.0/12 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
     '';
 
     extraStopCommands = ''
