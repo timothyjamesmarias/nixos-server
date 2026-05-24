@@ -39,6 +39,12 @@ info "Granting ownership"
 sudo -u postgres psql -c "ALTER DATABASE $DB_NAME OWNER TO $DB_USER;"
 sudo -u postgres psql -c "REVOKE ALL ON DATABASE $DB_NAME FROM PUBLIC;"
 
+info "Regenerating PgBouncer auth file..."
+sudo systemctl restart pgbouncer-auth 2>/dev/null && \
+  sudo systemctl restart pgbouncer 2>/dev/null && \
+  info "PgBouncer reloaded" || \
+  warn "PgBouncer not running yet — auth file will be generated on next boot"
+
 echo ""
 info "Database created successfully"
 echo ""
@@ -52,4 +58,4 @@ echo "Add this line to modules/postgresql.nix (appDatabases list):"
 echo ""
 echo "    { name = \"$APP_NAME\"; user = \"$DB_USER\"; dbName = \"$DB_NAME\"; }"
 echo ""
-echo "Then run: sudo nixos-rebuild switch --flake /path/to/nixos#server"
+echo "Then run: sudo nixos-rebuild switch --flake ~/nixos-server#server"
