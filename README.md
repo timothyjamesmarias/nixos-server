@@ -43,7 +43,6 @@ These are the values marked `TODO` throughout the config files:
 |---|---|---|
 | **stateVersion** | `configuration.nix` | Run `grep stateVersion /etc/nixos/configuration.nix` on the server |
 | **SSH public key(s)** | `modules/base.nix` | `ssh-ed25519 AAAA...` |
-| **Cloudflare email** | `modules/traefik.nix` | Your Cloudflare account email |
 | **ACME email** | `modules/traefik.nix` | Email for Let's Encrypt certificate notifications |
 | **GitHub username** | `modules/docker.nix` | Your GitHub username |
 | **PostgreSQL tuning** | `modules/postgresql.nix` | `shared_buffers` = 25% of server RAM |
@@ -56,6 +55,8 @@ These go in `secrets/secrets.yaml` (encrypted). See `secrets/secrets.example.yam
 |---|---|---|
 | **`ghcr-token`** | Pulling private images from GitHub Container Registry | GitHub → Settings → Developer settings → Personal access tokens → `read:packages` |
 | **`cloudflare-api-token`** | DDNS updates + DNS challenge for TLS certs | Cloudflare → My Profile → API Tokens → Zone:DNS:Edit (use **All Zones** for multi-domain setups) |
+| **`cloudflare-api-email`** | Cloudflare API authentication (paired with API token) | Your Cloudflare account email |
+| **`backup-encryption-key`** | Symmetric GPG key for encrypting backups | Generate with `openssl rand -base64 32` |
 | **`origin-cert-pem`** | Cloudflare Origin CA certificate (public) | Cloudflare → SSL/TLS → Origin Server → Create Certificate |
 | **`origin-cert-key`** | Cloudflare Origin CA private key | Generated with the cert above — save it, Cloudflare won't show it again |
 | **`grafana-admin-password`** | Grafana web UI login | Choose a password |
@@ -131,7 +132,7 @@ grep -rn "TODO" --include="*.nix"
 
 - `configuration.nix` — `stateVersion` (must match your NixOS install)
 - `modules/base.nix` — Your SSH public key on the `deploy` user
-- `modules/traefik.nix` — Cloudflare email and ACME email
+- `modules/traefik.nix` — ACME email
 - `modules/docker.nix` — GitHub username for GHCR login
 
 ### 5. Build without applying (dry run)
@@ -145,7 +146,7 @@ nixos-rebuild build --flake .#server
 **Review the config carefully before switching.** In particular, verify:
 - Port 22 is in `firewall.nix` `allowedTCPPorts` (or you will lose SSH access)
 - Your SSH key is configured on the `deploy` user
-- The `deploy` user exists and has sudo access
+- The `deploy` user exists and has scoped sudo access (nixos-rebuild, systemctl, nix-collect-garbage)
 
 ### 6. Clone on the server and apply
 
@@ -227,6 +228,7 @@ Internet → Cloudflare (proxy / DDoS / WAF — terminates public TLS)
       └─ NixOS Host (firewall: 22/80/443, Docker→LAN blocked)
           |
           ├─ Traefik (reverse proxy, origin TLS via Cloudflare Origin CA cert)
+          |    ├─ Docker Socket Proxy (restricted API access, read-only)
           |    ├─ app.foo.com          → app-one:8080
           |    ├─ dashboard.bar.org    → app-two:8080
           |    └─ grafana.foo.com      → grafana:3000
@@ -247,12 +249,12 @@ Internet → Cloudflare (proxy / DDoS / WAF — terminates public TLS)
 
 ### Network Isolation
 
-Each app container connects to `proxy-net` (so Traefik can route to it) and reaches PostgreSQL via `host.docker.internal:6432` (PgBouncer). Apps cannot communicate with each other. Docker containers are blocked from reaching the home LAN via iptables rules.
+Each app container connects to `proxy-net` (so Traefik can route to it) and reaches PostgreSQL via `host.docker.internal:6432` (PgBouncer). Apps cannot communicate with each other. Docker containers are blocked from reaching the home LAN via iptables rules. Traefik accesses the Docker API through a restricted socket proxy (read-only, containers and networks only).
 
 ```
-proxy-net        ← Traefik + all app containers (has internet access)
-postgres-net     ← Reserved for exporters (internal, no internet)
-monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector (internal, no internet)
+proxy-net        ← Traefik + socket proxy + all app containers
+postgres-net     ← Reserved for exporters
+monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector
 ```
 
 ## Adding a New App
@@ -302,12 +304,17 @@ sops.secrets."my-app/api-key" = { owner = "root"; };
 
 ### Backups
 
-| What | When | Retention |
-|---|---|---|
-| PostgreSQL databases | Daily 3:00 AM | 30 days |
-| Docker volumes | Weekly Sunday 4:00 AM | 30 days |
+| What | When | Retention | Format |
+|---|---|---|---|
+| PostgreSQL databases | Daily 3:00 AM | 30 days | `.sql.gz.gpg` (GPG encrypted) |
+| Docker volumes | Weekly Sunday 4:00 AM | 30 days | `.tar.gz.gpg` (GPG encrypted) |
 
-Stored in `/var/backups/`.
+Stored in `/var/backups/`. All backups are encrypted with a symmetric GPG key managed via sops (`backup-encryption-key` secret).
+
+To decrypt a backup manually:
+```bash
+gpg --decrypt --batch --passphrase-file /path/to/key backup.sql.gz.gpg | gunzip > backup.sql
+```
 
 ```bash
 ./scripts/backup-restore.sh list
@@ -352,16 +359,16 @@ sudo systemctl --failed
 ├── configuration.nix           Top-level imports + bootloader + static IP
 ├── hardware-configuration.nix  Hardware-specific config (generated on server)
 ├── modules/
-│   ├── base.nix                Users, locale, base packages, sudo rules
+│   ├── base.nix                Users, locale, base packages, scoped sudo, journald
 │   ├── ssh.nix                 SSH hardening + fail2ban
 │   ├── firewall.nix            iptables rules + Docker→LAN isolation
 │   ├── hardening.nix           Kernel sysctl + module blacklist
-│   ├── docker.nix              Docker daemon + shared networks (internal/external)
+│   ├── docker.nix              Docker daemon + shared networks + socket proxy
 │   ├── postgresql.nix          PostgreSQL + PgBouncer + app DB registry
 │   ├── traefik.nix             Reverse proxy + Origin CA TLS + ForwardAuth
 │   ├── cloudflare-ddns.nix     Automatic public IP → Cloudflare DNS updates
 │   ├── monitoring.nix          Prometheus, Grafana, Loki, OTel, exporters
-│   ├── backups.nix             Scheduled pg_dump + volume backups
+│   ├── backups.nix             Scheduled encrypted pg_dump + volume backups
 │   └── secrets.nix             sops-nix secret declarations
 ├── apps/
 │   └── _template.nix           Copy this for new apps
@@ -378,16 +385,19 @@ sudo systemctl --failed
 ```
 Layer 0  Cloudflare        Proxied mode — DDoS absorption, WAF, bot filtering, public TLS termination
 Layer 1  Router            Port forward only 80/443 to the server
-Layer 2  NixOS firewall    TCP 22/80/443 open, Docker→LAN traffic blocked (new connections only)
-Layer 3  SSH               Key-only auth, no root login, fail2ban (3 retries, 1h ban)
+Layer 2  NixOS firewall    TCP 22/80/443 open, Docker→LAN traffic blocked (new connections only), drop logging
+Layer 3  SSH               Key-only auth, no root login, fail2ban (3 retries, 1h ban, escalating)
 Layer 4  Kernel            sysctl hardening (syncookies, no redirects, rp_filter)
-Layer 5  Traefik           Origin CA TLS (Cloudflare ↔ server), HSTS, rate limiting, ForwardAuth
-Layer 6  Docker networks   Apps isolated from each other
+Layer 5  Traefik           Origin CA TLS (Cloudflare ↔ server), HSTS, CSP, rate limiting, ForwardAuth
+Layer 6  Docker            Socket proxy (restricted API), apps isolated from each other
 Layer 7  Auth service      JWT validation via Traefik ForwardAuth middleware
 Layer 8  App-level         Authorization logic in your Kotlin code
 Layer 9  PostgreSQL        Per-app user, scoped pg_hba.conf, no cross-db access
 Layer 10 PgBouncer         Bound to localhost + Docker bridge only
 Layer 11 Secrets           Encrypted at rest via sops-nix (age), decrypted at boot
-Layer 12 Metrics           Prometheus endpoint on internal port only, not publicly accessible
-Layer 13 DDNS              Auto-updates Cloudflare A records every 5 minutes if public IP changes
+Layer 12 Backups           GPG-encrypted, stored locally (offsite TBD)
+Layer 13 Sudo              Deploy user scoped to nixos-rebuild, systemctl, nix-collect-garbage only
+Layer 14 Logging           Persistent journald, firewall drop logging
+Layer 15 Metrics           Prometheus endpoint on internal port only, not publicly accessible
+Layer 16 DDNS              Auto-updates Cloudflare A records every 5 minutes if public IP changes
 ```

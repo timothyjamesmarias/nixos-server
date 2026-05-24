@@ -39,7 +39,7 @@ sops secrets/secrets.yaml
 
 ## Architecture
 
-- **flake.nix** — Entry point. Pins nixpkgs + sops-nix inputs, defines single `nixosConfigurations.server` output.
+- **flake.nix** — Entry point. Pins nixpkgs (by commit hash) + sops-nix inputs, defines single `nixosConfigurations.server` output.
 - **configuration.nix** — Top-level imports only. Add new app imports here.
 - **modules/** — Each file owns one concern (base, ssh, firewall, hardening, secrets, docker, postgresql, traefik, monitoring, backups).
 - **apps/** — One file per app container. `_template.nix` is the canonical starting point.
@@ -57,10 +57,13 @@ sops secrets/secrets.yaml
 ## Conventions
 
 - App names use kebab-case (`my-app`); database users/names use snake_case (`my_app`)
-- Images are pinned by digest (`sha256:...`), never by tag
+- All Docker images (app and infrastructure) are pinned by digest (`sha256:...`), never by tag
 - Each app gets its own Docker network isolation — connects to `proxy-net` for Traefik routing, reaches PostgreSQL via `host.docker.internal:6432` (PgBouncer)
 - Apps cannot communicate with each other
 - Secrets use sops-nix with age encryption; never store plaintext secrets
 - PostgreSQL has per-app users with scoped `pg_hba.conf` rules
-- Traefik labels on containers handle routing, TLS, and middleware (ForwardAuth, rate-limit, secure-headers)
+- Traefik labels on containers handle routing, TLS, and middleware (ForwardAuth, rate-limit, rate-limit-auth, secure-headers)
+- Traefik accesses Docker via a socket proxy (`tecnativa/docker-socket-proxy`), not a direct socket mount
+- The `deploy` user has scoped sudo (nixos-rebuild, systemctl, nix-collect-garbage only), not blanket wheel access
+- Backups are GPG-encrypted using a sops-managed symmetric key
 - TODOs in the codebase mark placeholders that need real values for deployment
