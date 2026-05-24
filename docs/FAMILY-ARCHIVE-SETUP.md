@@ -174,6 +174,19 @@ sudo -u postgres psql -c "ALTER USER family_archive WITH PASSWORD '<same passwor
 
 The password must match what you put in `family-archive/database-password` in secrets.yaml, because the env file generator constructs the `DATABASE_URL` with it.
 
+### PgBouncer auth file
+
+After setting the password, regenerate the PgBouncer auth file so it picks up the new credentials:
+
+```bash
+sudo systemctl restart pgbouncer-auth
+sudo systemctl restart pgbouncer
+```
+
+The `pgbouncer-auth` service extracts SCRAM password hashes from `pg_shadow` into `/run/pgbouncer-auth/userlist.txt`. PgBouncer reads this file to authenticate client connections. This must be rerun any time you change a database user's password.
+
+**Important:** The auth file lives in `/run/pgbouncer-auth/`, not `/run/pgbouncer/`. PgBouncer owns `/run/pgbouncer/` for its socket — using the same directory causes systemd to wipe one service's files when the other restarts.
+
 ## 7. GitHub — CI Deploy Key
 
 Generate an SSH key pair for GitHub Actions to use when deploying.
@@ -199,8 +212,12 @@ Add the **private key** as a GitHub repo secret:
 1. Go to familyArchive repo > Settings > Secrets and variables > Actions
 2. Add these repository secrets:
    - `SERVER_SSH_KEY`: paste the contents of `~/.ssh/github_actions_deploy`
-   - `SERVER_HOST`: your server's public IP (or DDNS hostname if you have one)
+   - `SERVER_HOST`: your server's public IP (or DDNS hostname like `server.timothymarias.com`)
    - `SERVER_USER`: `deploy`
+
+### Router port forwarding
+
+GitHub Actions needs to SSH into your server, so port 22 must be forwarded on your router. Forward external port 22 → `192.168.1.7:22` (TCP). On the Netgear router, access `http://192.168.1.1/start.htm` > Advanced > Advanced Setup > Port Forwarding.
 
 ## 8. Deploy
 
@@ -266,13 +283,26 @@ sudo cat /run/family-archive/env
 sudo ls -la /run/secrets/family-archive/
 ```
 
-### Database connection refused
+### Database connection refused / SASL auth failed
 ```bash
 # Verify PgBouncer is listening on the Docker bridge
 ss -tlnp | grep 6432
 
-# Test from inside the container
-docker exec family-archive sh -c 'wget -qO- http://localhost:8080/ || echo "app not responding"'
+# Test direct PostgreSQL connection (bypass PgBouncer)
+PGPASSWORD='<password>' psql -h 127.0.0.1 -p 5432 -U family_archive -d family_archive -c "SELECT 1;"
+
+# Test through PgBouncer
+PGPASSWORD='<password>' psql -h 127.0.0.1 -p 6432 -U family_archive -d family_archive -c "SELECT 1;"
+
+# If direct works but PgBouncer fails, regenerate the auth file
+sudo systemctl restart pgbouncer-auth
+sudo systemctl restart pgbouncer
+
+# Verify auth file has actual password hashes (not column headers)
+sudo cat /run/pgbouncer-auth/userlist.txt
+
+# Check PgBouncer logs for details
+sudo journalctl -u pgbouncer --no-pager -n 20
 
 # Check pg_hba.conf allows the Docker subnet
 sudo -u postgres psql -c "SELECT * FROM pg_hba_file_rules WHERE database::text LIKE '%family%';"
@@ -282,6 +312,22 @@ sudo -u postgres psql -c "SELECT * FROM pg_hba_file_rules WHERE database::text L
 - Verify the bucket exists and the region matches
 - Verify the IAM credentials are correct: `aws s3 ls s3://BUCKET_NAME/ --region REGION`
 - The container needs internet access — verify it's on `proxy-net` (not an internal network)
+
+### Traefik 404 / middleware not found
+
+If Traefik returns 404 or logs `middleware "X@file" does not exist`, the dynamic config file isn't being loaded.
+
+Traefik needs both a Docker provider (for container labels) and a file provider (for middlewares and TLS certs). Verify the static config has both:
+
+```bash
+cat /etc/traefik/traefik.yml | jq '.providers'
+```
+
+You should see both `docker` and `file` entries. If `file` is missing, it was added in `modules/traefik.nix` — rebuild and restart Traefik:
+
+```bash
+sudo systemctl restart docker-traefik
+```
 
 ### TLS / certificate errors
 - Verify Cloudflare SSL/TLS is set to "Full (strict)"

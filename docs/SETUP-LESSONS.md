@@ -227,3 +227,56 @@ Residential ISPs assign dynamic IPs via DHCP. The `cloudflare-ddns.nix` module c
 The basic Netgear router UI may not show port forwarding options. Access the full admin UI at `http://192.168.1.1/start.htm` to see the Advanced tab with Port Forwarding under Advanced Setup.
 
 The "Add Custom Service" button may not work (popup blocker or JavaScript issue). Workaround: add a built-in service type (like FTP), then edit it to change the name and port numbers.
+
+## PgBouncer auth_query requires a dedicated user
+
+PgBouncer's `auth_query` setting (looking up passwords from `pg_shadow`) requires PgBouncer to connect to PostgreSQL as a user with access to `pg_shadow`. This creates a circular problem: PgBouncer needs a password to connect, but it needs to connect to look up passwords.
+
+**Fix:** Use `auth_file` instead. A systemd oneshot service (`pgbouncer-auth`) runs after PostgreSQL starts and before PgBouncer starts. It dumps SCRAM hashes from `pg_shadow` into a file that PgBouncer reads directly. No special database user needed.
+
+After changing any database user's password, regenerate the auth file:
+```bash
+sudo systemctl restart pgbouncer-auth
+sudo systemctl restart pgbouncer
+```
+
+## PgBouncer RuntimeDirectory conflicts
+
+Multiple systemd services must NOT share the same `RuntimeDirectory`. PgBouncer uses `/run/pgbouncer/` for its Unix socket. If another service (like the auth file generator) also declares `RuntimeDirectory=pgbouncer`, restarting either service will wipe the other's files.
+
+The auth file generator uses `RuntimeDirectory=pgbouncer-auth` to avoid this. The auth file lives at `/run/pgbouncer-auth/userlist.txt`.
+
+## Traefik file provider must be explicitly configured
+
+Traefik's `dynamic.yml` (middlewares, TLS certs) is only loaded if a file provider is configured in the static config. Having the file mounted into the container is not enough — Traefik ignores it without `providers.file`.
+
+```nix
+# In traefik.nix static config
+providers.file = {
+  filename = "/etc/traefik/dynamic.yml";
+};
+```
+
+Without this, container labels work (via the Docker provider) but file-defined middlewares like `secure-headers@file` will show "does not exist" errors.
+
+## Nix string interpolation in shell scripts
+
+In Nix's `''...''` strings (used by `writeShellScript`), `${...}` is Nix interpolation. To get a literal shell variable like `${MY_VAR}`, escape it as `''${MY_VAR}`.
+
+SQL queries with double quotes inside Nix strings get messy fast. Write the SQL to a separate file with `pkgs.writeText` and pass it to `psql -f`:
+
+```nix
+ExecStart = let
+  sqlFile = pkgs.writeText "query.sql" ''
+    SELECT concat('"', col, '"') FROM table;
+  '';
+in pkgs.writeShellScript "my-script" ''
+  psql -Atf ${sqlFile} > /run/output.txt
+'';
+```
+
+## Port forwarding is required for CI/CD SSH deploys
+
+GitHub Actions runners are on the public internet. If your CI pipeline SSHs into the server to deploy, port 22 must be forwarded on your router to the server's LAN IP. Without it, the SSH connection will time out with `dial tcp: i/o timeout`.
+
+This is separate from the NixOS firewall allowing port 22 — the router is the first hop.
