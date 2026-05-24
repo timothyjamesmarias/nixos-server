@@ -96,7 +96,36 @@ Add this bucket policy (Bucket > Permissions > Bucket policy) to allow public re
 5. Create the user, then create an access key (use case: "Application running outside AWS")
 6. Save the Access Key ID and Secret Access Key — you'll need them for secrets
 
-## 4. Secrets — sops-nix
+## 4. GitHub Container Registry (GHCR)
+
+The server pulls Docker images from GHCR. It needs a Personal Access Token to authenticate.
+
+### Create the token
+
+1. Go to GitHub > Settings > Developer settings > Personal access tokens > **Tokens (classic)**
+2. Click "Generate new token" > "Generate new token (classic)"
+3. Name: `nixos-server-ghcr` (or similar)
+4. Expiration: pick something reasonable (90 days, or no expiration if you prefer)
+5. Select scopes:
+   - `read:packages` — pull images from GHCR
+   - `write:packages` — push images to GHCR (needed by CI)
+6. Generate token and copy it
+
+**Important**: use a classic token, not a fine-grained one. Fine-grained tokens don't support GHCR.
+
+### Add to secrets
+
+The token goes into `ghcr-token` in `secrets/secrets.yaml` (see next step). The server's `docker-ghcr-login` systemd service uses it to log into GHCR at boot.
+
+### Verify (after deploying secrets)
+
+```bash
+sudo cat /run/secrets/ghcr-token | docker login ghcr.io -u timothyjamesmarias --password-stdin
+```
+
+You should see `Login Succeeded`. If not, check the token scopes and that there's no trailing whitespace.
+
+## 5. Secrets — sops-nix
 
 Add all secrets to the encrypted secrets file.
 
@@ -132,7 +161,7 @@ family-archive:
 
 Save and close — sops encrypts automatically.
 
-## 5. Database — Set User Password
+## 6. Database — Set User Password
 
 NixOS `ensureDatabases` and `ensureUsers` will create the database and user, but you need to set the password manually (NixOS doesn't manage postgres passwords declaratively).
 
@@ -145,7 +174,7 @@ sudo -u postgres psql -c "ALTER USER family_archive WITH PASSWORD '<same passwor
 
 The password must match what you put in `family-archive/database-password` in secrets.yaml, because the env file generator constructs the `DATABASE_URL` with it.
 
-## 6. GitHub — CI Deploy Key
+## 7. GitHub — CI Deploy Key
 
 Generate an SSH key pair for GitHub Actions to use when deploying.
 
@@ -173,7 +202,7 @@ Add the **private key** as a GitHub repo secret:
    - `SERVER_HOST`: your server's public IP (or DDNS hostname if you have one)
    - `SERVER_USER`: `deploy`
 
-## 7. Deploy
+## 8. Deploy
 
 With all the above in place:
 
@@ -190,7 +219,7 @@ git pull
 sudo nixos-rebuild switch --flake ~/nixos-server#server
 ```
 
-Then set the database password (step 5 above).
+Then set the database password (step 6 above).
 
 For the first app deployment, you can either:
 - Create a GitHub release on familyArchive (triggers the full pipeline), or
@@ -208,7 +237,7 @@ docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/timothyjamesmarias/fa
 ./scripts/deploy.sh family-archive sha256:<digest>
 ```
 
-## 8. Verify
+## 9. Verify
 
 ```bash
 # On the server — check container is running and healthy
