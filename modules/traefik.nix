@@ -31,6 +31,10 @@
       network = "proxy-net";
     };
 
+    providers.file = {
+      filename = "/etc/traefik/dynamic.yml";
+    };
+
     # Metrics endpoint — internal only, not exposed publicly
     entryPoints.metrics = {
       address = ":8082";
