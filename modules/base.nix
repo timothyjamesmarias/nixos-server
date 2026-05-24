@@ -33,6 +33,7 @@
     extraGroups = [ "docker" "wheel" ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJvpe/fxnamo6zzOVoxK3WfouV1LyIrd5JCHXvfyH+v timmarias@Tims-MacBook-Pro.local"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIWlqtmRbbVgArHuUumeHGb5vsGBW+dFsQVVUTKHJBCs github-actions-deploy"
     ];
   };
 
