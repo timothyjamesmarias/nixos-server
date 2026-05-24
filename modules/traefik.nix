@@ -51,6 +51,10 @@
         certFile = "/certs/timothymarias.com.pem";
         keyFile = "/certs/timothymarias.com.key";
       }
+      {
+        certFile = "/certs/mariasfamilyarchive.com.pem";
+        keyFile = "/certs/mariasfamilyarchive.com.key";
+      }
     ];
 
     http.middlewares = {
@@ -69,6 +73,19 @@
           forceSTSHeader = true;
           contentTypeNosniff = true;
           frameDeny = true;
+          browserXssFilter = true;
+          referrerPolicy = "strict-origin-when-cross-origin";
+        };
+      };
+      # Same as secure-headers but allows iframes from same origin (for TinyMCE, etc.)
+      secure-headers-sameorigin = {
+        headers = {
+          stsSeconds = 31536000;
+          stsIncludeSubdomains = true;
+          stsPreload = true;
+          forceSTSHeader = true;
+          contentTypeNosniff = true;
+          customFrameOptionsValue = "SAMEORIGIN";
           browserXssFilter = true;
           referrerPolicy = "strict-origin-when-cross-origin";
         };
@@ -140,6 +157,11 @@
         cp ${config.sops.secrets."origin-cert-key".path} /run/traefik/certs/timothymarias.com.key
         chmod 644 /run/traefik/certs/timothymarias.com.pem
         chmod 600 /run/traefik/certs/timothymarias.com.key
+
+        cp ${config.sops.secrets."origin-cert-pem-familyarchive".path} /run/traefik/certs/mariasfamilyarchive.com.pem
+        cp ${config.sops.secrets."origin-cert-key-familyarchive".path} /run/traefik/certs/mariasfamilyarchive.com.key
+        chmod 644 /run/traefik/certs/mariasfamilyarchive.com.pem
+        chmod 600 /run/traefik/certs/mariasfamilyarchive.com.key
       '';
     };
   };

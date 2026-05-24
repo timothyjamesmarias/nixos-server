@@ -41,6 +41,48 @@
         owner = "root";
       };
 
+      # mariasfamilyarchive.com origin CA certificate
+      "origin-cert-pem-familyarchive" = {
+        owner = "root";
+      };
+
+      "origin-cert-key-familyarchive" = {
+        owner = "root";
+      };
+
+      # family-archive app secrets
+      "family-archive/session-secret" = {
+        owner = "root";
+      };
+
+      "family-archive/admin-email" = {
+        owner = "root";
+      };
+
+      "family-archive/admin-password" = {
+        owner = "root";
+      };
+
+      "family-archive/database-password" = {
+        owner = "root";
+      };
+
+      "family-archive/s3-bucket" = {
+        owner = "root";
+      };
+
+      "family-archive/s3-region" = {
+        owner = "root";
+      };
+
+      "family-archive/aws-access-key-id" = {
+        owner = "root";
+      };
+
+      "family-archive/aws-secret-access-key" = {
+        owner = "root";
+      };
+
 };
   };
 }

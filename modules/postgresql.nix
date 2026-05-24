@@ -4,7 +4,7 @@ let
   # Central app database registry.
   # Add one entry per app. Each gets a dedicated database + user.
   appDatabases = [
-    # { name = "my-app"; user = "my_app"; dbName = "my_app"; }
+    { name = "family-archive"; user = "family_archive"; dbName = "family_archive"; }
   ];
 
   # Docker bridge subnet — containers connect from this range.

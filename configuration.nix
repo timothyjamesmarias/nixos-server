@@ -25,6 +25,7 @@
     ./modules/ups.nix  # disabled by default; enable with services.ups.enable = true
 
     # Apps — add new app imports here
+    ./apps/family-archive.nix
   ];
 
   boot.loader.systemd-boot.enable = true;
