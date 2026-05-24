@@ -48,6 +48,7 @@ in
       ''
         # Local connections (backups, admin)
         local all      postgres                peer
+
         local all      all                     peer
 
         # PgBouncer connects via localhost
@@ -66,6 +67,28 @@ in
     );
   };
 
+  # Generate PgBouncer auth file from PostgreSQL password hashes
+  systemd.services.pgbouncer-auth = {
+    description = "Generate PgBouncer userlist.txt from pg_shadow";
+    after = [ "postgresql.service" ];
+    requires = [ "postgresql.service" ];
+    before = [ "pgbouncer.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      User = "postgres";
+      ExecStart = pkgs.writeShellScript "pgbouncer-auth" ''
+        mkdir -p /run/pgbouncer
+        ${config.services.postgresql.package}/bin/psql -Atc \
+          "SELECT '\"' || usename || '\" \"' || passwd || '\"' FROM pg_shadow WHERE passwd IS NOT NULL;" \
+          > /run/pgbouncer/userlist.txt
+        chmod 640 /run/pgbouncer/userlist.txt
+        chown postgres:pgbouncer /run/pgbouncer/userlist.txt
+      '';
+    };
+  };
+
   # --- PgBouncer ---
 
   services.pgbouncer = {
@@ -82,7 +105,7 @@ in
         listen_port = 6432;
 
         auth_type = "scram-sha-256";
-        auth_query = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1";
+        auth_file = "/run/pgbouncer/userlist.txt";
       };
 
       databases = lib.listToAttrs (map (app: {
