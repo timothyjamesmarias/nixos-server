@@ -45,7 +45,7 @@ in
 
   # Docker socket proxy — restricts API access for Traefik
   virtualisation.oci-containers.containers.docker-socket-proxy = {
-    image = "tecnativa/docker-socket-proxy:0.3.0";
+    image = "tecnativa/docker-socket-proxy@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2";
     volumes = [
       "/var/run/docker.sock:/var/run/docker.sock:ro"
     ];
