@@ -49,14 +49,10 @@ Create a dedicated S3 bucket and scoped IAM credentials.
 1. Go to AWS Console > S3 > Create bucket
 2. Bucket name: something like `marias-family-archive` (globally unique)
 3. Region: pick one close to your server (e.g., `us-east-1`)
-4. Block all public access: **leave enabled** (the app generates signed URLs or serves through itself)
+4. Block all public access: **uncheck this** — the app serves images via direct public S3 URLs (`https://BUCKET.s3.REGION.amazonaws.com/PATH`), so objects need to be publicly readable
 5. Create bucket
 
-If the app needs public read access for images (it generates public S3 URLs via `GenerateURL()`), you'll need to either:
-- Unblock public access and add a bucket policy allowing `s3:GetObject` on `arn:aws:s3:::BUCKET_NAME/*`
-- Or set up CloudFront in front of the bucket
-
-Since `GenerateURL()` returns `https://BUCKET.s3.REGION.amazonaws.com/PATH`, the objects need to be publicly readable. Add this bucket policy:
+Add this bucket policy (Bucket > Permissions > Bucket policy) to allow public reads:
 
 ```json
 {
@@ -72,8 +68,6 @@ Since `GenerateURL()` returns `https://BUCKET.s3.REGION.amazonaws.com/PATH`, the
   ]
 }
 ```
-
-And uncheck "Block all public access" for the bucket.
 
 ### Create IAM user
 
@@ -91,8 +85,7 @@ And uncheck "Block all public access" for the bucket.
       "Action": [
         "s3:PutObject",
         "s3:GetObject",
-        "s3:DeleteObject",
-        "s3:HeadObject"
+        "s3:DeleteObject"
       ],
       "Resource": "arn:aws:s3:::BUCKET_NAME/*"
     }
