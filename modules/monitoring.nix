@@ -130,7 +130,7 @@
 
   virtualisation.oci-containers.containers = {
     prometheus = {
-      image = "prom/prometheus:v3.2.1"; # TODO: pin SHA
+      image = "prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62";
       volumes = [
         "/etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
         "prometheus-data:/prometheus"
@@ -143,7 +143,7 @@
     };
 
     grafana = {
-      image = "grafana/grafana:11.5.2"; # TODO: pin SHA
+      image = "grafana/grafana@sha256:8b37a2f028f164ce7b9889e1765b9d6ee23fec80f871d156fbf436d6198d32b7";
       volumes = [
         "grafana-data:/var/lib/grafana"
         "/etc/grafana/provisioning:/etc/grafana/provisioning:ro"
@@ -168,7 +168,7 @@
     };
 
     loki = {
-      image = "grafana/loki:3.4.2"; # TODO: pin SHA
+      image = "grafana/loki@sha256:58a6c186ce78ba04d58bfe2a927eff296ba733a430df09645d56cdc158f3ba08";
       volumes = [
         "/etc/loki/config.yaml:/etc/loki/config.yaml:ro"
         "loki-data:/loki"
@@ -178,7 +178,7 @@
     };
 
     otel-collector = {
-      image = "otel/opentelemetry-collector-contrib:0.120.0"; # TODO: pin SHA
+      image = "otel/opentelemetry-collector-contrib@sha256:85ac41c2db88d0df9bd6145e608a3cb023f5d8443868adbfbbf66efb51087917";
       volumes = [
         "/etc/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro"
       ];
@@ -189,7 +189,7 @@
     };
 
     node-exporter = {
-      image = "prom/node-exporter:v1.9.0";
+      image = "prom/node-exporter@sha256:c99d7ee4d12a38661788f60d9eca493f08584e2e544bbd3b3fca64749f86b848";
       volumes = [
         "/proc:/host/proc:ro"
         "/sys:/host/sys:ro"
@@ -205,7 +205,7 @@
     };
 
     postgres-exporter = {
-      image = "prometheuscommunity/postgres-exporter:v0.16.0";
+      image = "prometheuscommunity/postgres-exporter@sha256:6999a7657e2f2fb0ca6ebf417213eebf6dc7d21b30708c622f6fcb11183a2bb0";
       environmentFiles = [
         "/run/postgres-exporter/env"
       ];

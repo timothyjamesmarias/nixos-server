@@ -58,10 +58,10 @@ restore_db() {
   [[ "$confirm" != "y" && "$confirm" != "Y" ]] && { echo "Aborted."; exit 0; }
 
   info "Dropping database $db_name..."
-  sudo -u postgres psql -c "DROP DATABASE IF EXISTS $db_name;"
+  sudo -u postgres psql -c "DROP DATABASE IF EXISTS \"$db_name\";"
 
   info "Creating database $db_name..."
-  sudo -u postgres psql -c "CREATE DATABASE $db_name;"
+  sudo -u postgres psql -c "CREATE DATABASE \"$db_name\";"
 
   info "Restoring from $backup_file..."
   gunzip -c "$backup_file" | sudo -u postgres psql -d "$db_name"
@@ -71,7 +71,8 @@ restore_db() {
 
 restore_volume() {
   local vol_name="$1"
-  local backup_file="$VOL_BACKUP_DIR/$2"
+  local backup_name="$2"
+  local backup_file="$VOL_BACKUP_DIR/$backup_name"
 
   [[ ! -f "$backup_file" ]] && error "Backup file not found: $backup_file"
 
@@ -83,7 +84,7 @@ restore_volume() {
   docker run --rm \
     -v "$vol_name":/target \
     -v "$VOL_BACKUP_DIR":/backup:ro \
-    alpine sh -c "rm -rf /target/* && tar xzf /backup/$2 -C /target"
+    alpine sh -c 'rm -rf /target/* && tar xzf "/backup/$1" -C /target' -- "$backup_name"
 
   info "Volume restore complete"
 }

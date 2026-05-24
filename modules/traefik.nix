@@ -79,6 +79,7 @@
           frameDeny = true;
           browserXssFilter = true;
           referrerPolicy = "strict-origin-when-cross-origin";
+          contentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'";
         };
       };
       # Same as secure-headers but allows iframes from same origin (for TinyMCE, etc.)
@@ -92,6 +93,7 @@
           customFrameOptionsValue = "SAMEORIGIN";
           browserXssFilter = true;
           referrerPolicy = "strict-origin-when-cross-origin";
+          contentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'";
         };
       };
       # ForwardAuth — delegates authentication to your auth service.
@@ -107,7 +109,7 @@
   };
 
   virtualisation.oci-containers.containers.traefik = {
-    image = "traefik:v3.6";
+    image = "traefik@sha256:f79c88ed5252ae1e31c757a9796d751461ddb502437b8d8526db9e12605a82eb";
     ports = [
       "80:80"
       "443:443"

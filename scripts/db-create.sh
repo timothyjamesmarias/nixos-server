@@ -30,14 +30,14 @@ DB_NAME="$3"
 DB_PASS="${4:-$(openssl rand -base64 32)}"
 
 info "Creating database: $DB_NAME"
-sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;" 2>/dev/null || warn "Database $DB_NAME already exists"
+sudo -u postgres psql -c "CREATE DATABASE \"$DB_NAME\";" 2>/dev/null || warn "Database $DB_NAME already exists"
 
 info "Creating user: $DB_USER"
-sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || warn "User $DB_USER already exists"
+sudo -u postgres psql -c "CREATE USER \"$DB_USER\" WITH PASSWORD '$DB_PASS';" 2>/dev/null || warn "User $DB_USER already exists"
 
 info "Granting ownership"
-sudo -u postgres psql -c "ALTER DATABASE $DB_NAME OWNER TO $DB_USER;"
-sudo -u postgres psql -c "REVOKE ALL ON DATABASE $DB_NAME FROM PUBLIC;"
+sudo -u postgres psql -c "ALTER DATABASE \"$DB_NAME\" OWNER TO \"$DB_USER\";"
+sudo -u postgres psql -c "REVOKE ALL ON DATABASE \"$DB_NAME\" FROM PUBLIC;"
 
 info "Regenerating PgBouncer auth file..."
 sudo systemctl restart pgbouncer-auth 2>/dev/null && \
