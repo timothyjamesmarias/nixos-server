@@ -77,7 +77,7 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      RuntimeDirectory = "pgbouncer";
+      RuntimeDirectory = "pgbouncer-auth";
       RuntimeDirectoryMode = "0755";
       ExecStart = let
         psql = "${config.services.postgresql.package}/bin/psql";
@@ -85,9 +85,9 @@ in
           SELECT concat('"', usename, '" "', passwd, '"') FROM pg_shadow WHERE passwd IS NOT NULL;
         '';
       in pkgs.writeShellScript "pgbouncer-auth" ''
-        ${pkgs.sudo}/bin/sudo -u postgres ${psql} -Atf ${sqlFile} > /run/pgbouncer/userlist.txt
-        chmod 640 /run/pgbouncer/userlist.txt
-        chgrp pgbouncer /run/pgbouncer/userlist.txt
+        ${pkgs.sudo}/bin/sudo -u postgres ${psql} -Atf ${sqlFile} > /run/pgbouncer-auth/userlist.txt
+        chmod 640 /run/pgbouncer-auth/userlist.txt
+        chgrp pgbouncer /run/pgbouncer-auth/userlist.txt
       '';
     };
   };
@@ -108,7 +108,7 @@ in
         listen_port = 6432;
 
         auth_type = "scram-sha-256";
-        auth_file = "/run/pgbouncer/userlist.txt";
+        auth_file = "/run/pgbouncer-auth/userlist.txt";
       };
 
       databases = lib.listToAttrs (map (app: {
