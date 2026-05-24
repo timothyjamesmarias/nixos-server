@@ -77,14 +77,15 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      User = "postgres";
-      ExecStart = pkgs.writeShellScript "pgbouncer-auth" ''
-        mkdir -p /run/pgbouncer
-        ${config.services.postgresql.package}/bin/psql -Atc \
-          "SELECT '\"' || usename || '\" \"' || passwd || '\"' FROM pg_shadow WHERE passwd IS NOT NULL;" \
-          > /run/pgbouncer/userlist.txt
+      RuntimeDirectory = "pgbouncer";
+      RuntimeDirectoryMode = "0755";
+      ExecStart = let
+        sql = "SELECT concat('\"', usename, '\" \"', passwd, '\"') FROM pg_shadow WHERE passwd IS NOT NULL";
+        psql = "${config.services.postgresql.package}/bin/psql";
+      in pkgs.writeShellScript "pgbouncer-auth" ''
+        ${pkgs.sudo}/bin/sudo -u postgres ${psql} -Atc "${sql}" > /run/pgbouncer/userlist.txt
         chmod 640 /run/pgbouncer/userlist.txt
-        chown postgres:pgbouncer /run/pgbouncer/userlist.txt
+        chgrp pgbouncer /run/pgbouncer/userlist.txt
       '';
     };
   };
