@@ -2,9 +2,10 @@
 
 let
   backupDir = "/var/backups";
+  encKeyPath = config.sops.secrets."backup-encryption-key".path;
 
   # Databases to back up — keep in sync with postgresql.nix appDatabases
-  databases = []; # Add database names as you add apps
+  databases = [ "family_archive" ];
 
   pgBackupScript = pkgs.writeShellScript "pg-backup" ''
     set -euo pipefail
@@ -15,11 +16,13 @@ let
     for DB in ${lib.concatStringsSep " " databases}; do
       echo "Backing up database: $DB"
       ${pkgs.postgresql_16}/bin/pg_dump -U postgres "$DB" \
-        | ${pkgs.gzip}/bin/gzip > "$BACKUP_DIR/$DB-$DATE.sql.gz"
+        | ${pkgs.gzip}/bin/gzip \
+        | ${pkgs.gnupg}/bin/gpg --symmetric --batch --yes --passphrase-file ${encKeyPath} \
+          -o "$BACKUP_DIR/$DB-$DATE.sql.gz.gpg"
     done
 
     # Prune backups older than 30 days
-    ${pkgs.findutils}/bin/find "$BACKUP_DIR" -name "*.sql.gz" -mtime +30 -delete
+    ${pkgs.findutils}/bin/find "$BACKUP_DIR" -name "*.sql.gz.gpg" -mtime +30 -delete
     echo "PostgreSQL backup complete"
   '';
 
@@ -36,10 +39,15 @@ let
         -v "$VOL":/source:ro \
         -v "$BACKUP_DIR":/backup \
         alpine tar czf "/backup/$VOL-$DATE.tar.gz" -C /source .
+
+      # Encrypt the backup
+      ${pkgs.gnupg}/bin/gpg --symmetric --batch --yes --passphrase-file ${encKeyPath} \
+        -o "$BACKUP_DIR/$VOL-$DATE.tar.gz.gpg" "$BACKUP_DIR/$VOL-$DATE.tar.gz"
+      rm -f "$BACKUP_DIR/$VOL-$DATE.tar.gz"
     done
 
     # Prune volume backups older than 30 days
-    ${pkgs.findutils}/bin/find "$BACKUP_DIR" -name "*.tar.gz" -mtime +30 -delete
+    ${pkgs.findutils}/bin/find "$BACKUP_DIR" -name "*.tar.gz.gpg" -mtime +30 -delete
     echo "Volume backup complete"
   '';
 in

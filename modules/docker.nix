@@ -43,6 +43,37 @@ in
     };
   };
 
+  # Docker socket proxy — restricts API access for Traefik
+  virtualisation.oci-containers.containers.docker-socket-proxy = {
+    image = "tecnativa/docker-socket-proxy:0.3.0";
+    volumes = [
+      "/var/run/docker.sock:/var/run/docker.sock:ro"
+    ];
+    environment = {
+      CONTAINERS = "1";
+      NETWORKS = "1";
+      SERVICES = "0";
+      TASKS = "0";
+      SWARM = "0";
+      NODES = "0";
+      BUILD = "0";
+      COMMIT = "0";
+      CONFIGS = "0";
+      DISTRIBUTION = "0";
+      EXEC = "0";
+      IMAGES = "0";
+      INFO = "0";
+      PLUGINS = "0";
+      SECRETS = "0";
+      SYSTEM = "0";
+      VOLUMES = "0";
+      POST = "0";
+    };
+    extraOptions = [
+      "--network=proxy-net"
+    ];
+  };
+
   # Create shared Docker networks
   systemd.services = lib.mkMerge (map mkNetworkService networks ++ [
     {
@@ -62,6 +93,11 @@ in
           '';
         };
       };
+    }
+    {
+      # Ensure socket proxy starts after proxy-net exists
+      docker-docker-socket-proxy.after = [ "docker-network-proxy-net.service" ];
+      docker-docker-socket-proxy.requires = [ "docker-network-proxy-net.service" ];
     }
   ]);
 }

@@ -21,6 +21,10 @@
         owner = "root";
       };
 
+      "cloudflare-api-email" = {
+        owner = "root";
+      };
+
       "grafana-admin-password" = {
         owner = "root";
       };
@@ -83,6 +87,9 @@
         owner = "root";
       };
 
+      "backup-encryption-key" = {
+        owner = "root";
+      };
 };
   };
 }

@@ -26,7 +26,7 @@
     };
 
     providers.docker = {
-      endpoint = "unix:///var/run/docker.sock";
+      endpoint = "tcp://docker-socket-proxy:2375";
       exposedByDefault = false;
       network = "proxy-net";
     };
@@ -96,6 +96,14 @@
           contentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'";
         };
       };
+      # Stricter rate limit for authentication endpoints
+      rate-limit-auth = {
+        rateLimit = {
+          average = 10;
+          burst = 20;
+          period = "1m";
+        };
+      };
       # ForwardAuth — delegates authentication to your auth service.
       # Requests are forwarded to the auth service; 2xx = allow, 4xx = deny.
       forward-auth = {
@@ -115,16 +123,12 @@
       "443:443"
     ];
     volumes = [
-      "/var/run/docker.sock:/var/run/docker.sock:ro"
       "/etc/traefik/traefik.yml:/traefik.yml:ro"
       "/etc/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"
       "/run/traefik/certs:/certs:ro"
       "traefik-acme:/acme"
     ];
-    environment = {
-      CF_API_EMAIL = "tim@timothymarias.com";
-
-    };
+    environment = {};
     environmentFiles = [
       "/run/traefik/env"
     ];
@@ -136,13 +140,15 @@
     };
   };
 
-  # Ensure Traefik starts after networks exist
+  # Ensure Traefik starts after networks and socket proxy exist
   systemd.services.docker-traefik = {
     after = [
       "docker-network-proxy-net.service"
+      "docker-docker-socket-proxy.service"
     ];
     requires = [
       "docker-network-proxy-net.service"
+      "docker-docker-socket-proxy.service"
     ];
   };
 
@@ -157,7 +163,10 @@
       RemainAfterExit = true;
       ExecStart = pkgs.writeShellScript "traefik-env" ''
         mkdir -p /run/traefik/certs
-        echo "CF_DNS_API_TOKEN=$(cat ${config.sops.secrets."cloudflare-api-token".path})" > /run/traefik/env
+        {
+          echo "CF_DNS_API_TOKEN=$(cat ${config.sops.secrets."cloudflare-api-token".path})"
+          echo "CF_API_EMAIL=$(cat ${config.sops.secrets."cloudflare-api-email".path})"
+        } > /run/traefik/env
         chmod 600 /run/traefik/env
         cp ${config.sops.secrets."origin-cert-pem".path} /run/traefik/certs/timothymarias.com.pem
         cp ${config.sops.secrets."origin-cert-key".path} /run/traefik/certs/timothymarias.com.key
