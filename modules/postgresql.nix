@@ -80,10 +80,12 @@ in
       RuntimeDirectory = "pgbouncer";
       RuntimeDirectoryMode = "0755";
       ExecStart = let
-        sql = "SELECT concat('\"', usename, '\" \"', passwd, '\"') FROM pg_shadow WHERE passwd IS NOT NULL";
         psql = "${config.services.postgresql.package}/bin/psql";
+        sqlFile = pkgs.writeText "pgbouncer-auth.sql" ''
+          SELECT concat('"', usename, '" "', passwd, '"') FROM pg_shadow WHERE passwd IS NOT NULL;
+        '';
       in pkgs.writeShellScript "pgbouncer-auth" ''
-        ${pkgs.sudo}/bin/sudo -u postgres ${psql} -Atc "${sql}" > /run/pgbouncer/userlist.txt
+        ${pkgs.sudo}/bin/sudo -u postgres ${psql} -Atf ${sqlFile} > /run/pgbouncer/userlist.txt
         chmod 640 /run/pgbouncer/userlist.txt
         chgrp pgbouncer /run/pgbouncer/userlist.txt
       '';
