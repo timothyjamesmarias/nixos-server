@@ -49,7 +49,7 @@ info "Updated $SHA_FILE"
 sudo systemctl reset-failed "docker-${APP_NAME}" 2>/dev/null || true
 
 info "Rebuilding NixOS configuration..."
-sudo nixos-rebuild switch --flake "$NIXOS_DIR#server"
+sudo nixos-rebuild switch --impure --flake "$NIXOS_DIR#server"
 
 info "Waiting for container to start..."
 MAX_WAIT=30
