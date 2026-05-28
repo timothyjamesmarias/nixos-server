@@ -31,6 +31,7 @@
     tmux
     ripgrep
     fd
+    openssl
   ];
 
   # Root password from sops (safety net for manual administration)
