@@ -72,6 +72,7 @@ in
     after = [
       "docker-network-proxy-net.service"
       "${appName}-env.service"
+      "pgbouncer.service"
     ];
     requires = [
       "docker-network-proxy-net.service"
