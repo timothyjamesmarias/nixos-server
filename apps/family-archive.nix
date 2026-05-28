@@ -76,6 +76,8 @@ in
     ];
     requires = [
       "docker-network-proxy-net.service"
+    ];
+    bindsTo = [
       "${appName}-env.service"
     ];
   };
