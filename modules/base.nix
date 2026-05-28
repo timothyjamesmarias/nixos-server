@@ -67,7 +67,7 @@
       users = [ "deploy" ];
       runAs = "postgres";
       commands = [
-        { command = "${config.services.postgresql.package}/bin/psql *"; options = [ "NOPASSWD" ]; }
+        { command = "ALL"; options = [ "NOPASSWD" ]; }
       ];
     }
   ];
