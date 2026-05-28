@@ -90,6 +90,11 @@
       "backup-encryption-key" = {
         owner = "root";
       };
-};
+
+      # home-cooking app secrets
+      "home-cooking/database-password" = {
+        owner = "root";
+      };
+    };
   };
 }

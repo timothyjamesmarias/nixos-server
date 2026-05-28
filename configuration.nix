@@ -26,6 +26,7 @@
 
     # Apps — add new app imports here
     ./apps/family-archive.nix
+    ./apps/home-cooking.nix
   ];
 
   boot.loader.systemd-boot.enable = true;

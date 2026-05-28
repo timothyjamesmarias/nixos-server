@@ -5,6 +5,7 @@ let
   # Add one entry per app. Each gets a dedicated database + user.
   appDatabases = [
     { name = "family-archive"; user = "family_archive"; dbName = "family_archive"; }
+    { name = "home-cooking"; user = "home_cooking"; dbName = "home_cooking"; }
   ];
 
   # Docker bridge subnet — containers connect from this range.
