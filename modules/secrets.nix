@@ -91,6 +91,11 @@
         owner = "root";
       };
 
+      "root-password" = {
+        owner = "root";
+        neededForUsers = true;
+      };
+
       # home-cooking app secrets
       "home-cooking/database-password" = {
         owner = "root";

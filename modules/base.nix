@@ -33,6 +33,9 @@
     fd
   ];
 
+  # Root password from sops (safety net for manual administration)
+  users.users.root.hashedPasswordFile = config.sops.secrets."root-password".path;
+
   # Deploy user — used for SSH access and managing containers
   users.users.deploy = {
     isNormalUser = true;
@@ -52,6 +55,7 @@
       { command = "/run/current-system/sw/bin/systemctl stop *"; options = [ "NOPASSWD" ]; }
       { command = "/run/current-system/sw/bin/systemctl status *"; options = [ "NOPASSWD" ]; }
       { command = "/run/current-system/sw/bin/nix-collect-garbage *"; options = [ "NOPASSWD" ]; }
+      { command = "${config.services.postgresql.package}/bin/psql *"; options = [ "NOPASSWD" ]; runAs = "postgres"; }
     ];
   }];
 }
