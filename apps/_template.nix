@@ -7,13 +7,13 @@
 #   3. Add environment variables and secrets (see comments below)
 #   4. Add a database entry to modules/postgresql.nix (appDatabases list):
 #        { name = "my-app"; user = "my_app"; dbName = "my_app"; }
-#   5. Add app secrets to secrets/secrets.yaml (and declare them in modules/secrets.nix)
+#   5. Add app secrets to secrets/secrets.yaml (and declare them in modules/secrets.nix):
+#        - my-app/database-password (required — set automatically on rebuild)
 #   6. Import the new file in configuration.nix
 #   7. Deploy: nixos-rebuild switch --flake ~/nixos-server#server
-#   8. Set the database password:
-#        sudo -u postgres psql -c "ALTER USER my_app WITH PASSWORD '...';"
-#   9. Regenerate PgBouncer auth file:
-#        sudo systemctl restart pgbouncer-auth && sudo systemctl restart pgbouncer
+#
+# Database passwords are set automatically from sops secrets on every rebuild.
+# No manual psql or PgBouncer restarts needed.
 #
 # Domain notes:
 #   - Each app can use any domain or subdomain you control.

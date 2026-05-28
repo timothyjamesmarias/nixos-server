@@ -68,11 +68,39 @@ in
     );
   };
 
+  # Set database passwords from sops secrets, then regenerate PgBouncer auth.
+  # Adding a new app only requires:
+  #   1. Add entry to appDatabases above
+  #   2. Add <app-name>/database-password to sops secrets
+  #   3. Rebuild — passwords are set automatically
+  systemd.services.db-passwords = {
+    description = "Set database passwords from sops secrets";
+    after = [ "postgresql.service" "sops-nix.service" ];
+    requires = [ "postgresql.service" ];
+    before = [ "pgbouncer-auth.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = let
+        psql = "${config.services.postgresql.package}/bin/psql";
+      in pkgs.writeShellScript "db-passwords" ''
+        ${lib.concatMapStringsSep "\n" (app: ''
+          PASS="$(cat ${config.sops.secrets."${app.name}/database-password".path} 2>/dev/null || true)"
+          if [ -n "$PASS" ]; then
+            ${pkgs.sudo}/bin/sudo -u postgres ${psql} -c "ALTER USER ${app.user} WITH PASSWORD '$PASS';" 2>/dev/null
+            echo "Set password for ${app.user}"
+          fi
+        '') appDatabases}
+      '';
+    };
+  };
+
   # Generate PgBouncer auth file from PostgreSQL password hashes
   systemd.services.pgbouncer-auth = {
     description = "Generate PgBouncer userlist.txt from pg_shadow";
-    after = [ "postgresql.service" ];
-    requires = [ "postgresql.service" ];
+    after = [ "postgresql.service" "db-passwords.service" ];
+    requires = [ "postgresql.service" "db-passwords.service" ];
     before = [ "pgbouncer.service" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
