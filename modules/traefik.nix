@@ -144,12 +144,16 @@
   systemd.services.docker-traefik = {
     after = [
       "docker-network-proxy-net.service"
+      "docker-network-monitoring-net.service"
       "docker-docker-socket-proxy.service"
     ];
     requires = [
       "docker-network-proxy-net.service"
+      "docker-network-monitoring-net.service"
       "docker-docker-socket-proxy.service"
     ];
+    # Connect Traefik to monitoring-net so Prometheus can scrape its metrics
+    postStart = "${pkgs.docker}/bin/docker network connect monitoring-net traefik 2>/dev/null || true";
   };
 
   # Write Cloudflare API token to a file Traefik can read

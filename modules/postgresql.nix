@@ -39,10 +39,12 @@ in
 
     ensureDatabases = map (app: app.dbName) appDatabases;
 
-    ensureUsers = map (app: {
+    ensureUsers = (map (app: {
       name = app.user;
       ensureDBOwnership = true;
-    }) appDatabases;
+    }) appDatabases) ++ [
+      { name = "postgres_exporter"; }
+    ];
 
     # Per-app authentication: each user can only connect to its own database
     authentication = lib.mkForce (
@@ -92,6 +94,18 @@ in
             echo "Set password for ${app.user}"
           fi
         '') appDatabases}
+
+        # Postgres exporter monitoring user
+        EXPORTER_DSN="$(cat ${config.sops.secrets."postgres-exporter-dsn".path} 2>/dev/null || true)"
+        if [ -n "$EXPORTER_DSN" ]; then
+          # Extract password from DSN (format: postgresql://user:pass@host:port/db)
+          EXPORTER_PASS="$(echo "$EXPORTER_DSN" | ${pkgs.gnused}/bin/sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')"
+          if [ -n "$EXPORTER_PASS" ]; then
+            ${pkgs.sudo}/bin/sudo -u postgres ${psql} -c "ALTER USER postgres_exporter WITH PASSWORD '$EXPORTER_PASS';" 2>/dev/null
+            ${pkgs.sudo}/bin/sudo -u postgres ${psql} -c "GRANT pg_monitor TO postgres_exporter;" 2>/dev/null
+            echo "Set password for postgres_exporter"
+          fi
+        fi
       '';
     };
   };
@@ -133,17 +147,19 @@ in
         default_pool_size = 20;
         min_pool_size = 5;
 
-        listen_addr = "127.0.0.1,172.17.0.1";
+        listen_addr = "0.0.0.0";
         listen_port = 6432;
 
         auth_type = "scram-sha-256";
         auth_file = "/run/pgbouncer-auth/userlist.txt";
       };
 
-      databases = lib.listToAttrs (map (app: {
+      databases = lib.listToAttrs ((map (app: {
         name = app.dbName;
         value = "host=127.0.0.1 port=5432 dbname=${app.dbName}";
-      }) appDatabases);
+      }) appDatabases) ++ [
+        { name = "postgres"; value = "host=127.0.0.1 port=5432 dbname=postgres"; }
+      ]);
     };
   };
 

@@ -24,7 +24,7 @@
       }
       {
         job_name = "traefik";
-        static_configs = [{ targets = [ "traefik:8080" ]; }];
+        static_configs = [{ targets = [ "traefik:8082" ]; }];
       }
       {
         job_name = "otel-collector";
@@ -151,17 +151,18 @@
       environment = {
         GF_SECURITY_ADMIN_USER = "admin";
         # GF_SECURITY_ADMIN_PASSWORD set via environmentFiles
-        GF_SERVER_ROOT_URL = "https://grafana.example.com"; # TODO: your domain
+        GF_SERVER_ROOT_URL = "https://grafana.timothymarias.com";
       };
+      environmentFiles = [ "/run/grafana/env" ];
       extraOptions = [
         "--network=monitoring-net"
         "--network=proxy-net"
       ];
       labels = {
         "traefik.enable" = "true";
-        "traefik.http.routers.grafana.rule" = "Host(`grafana.example.com`)"; # TODO: your domain
+        "traefik.http.routers.grafana.rule" = "Host(`grafana.timothymarias.com`)";
         "traefik.http.routers.grafana.entrypoints" = "websecure";
-        "traefik.http.routers.grafana.tls.certresolver" = "letsencrypt";
+        "traefik.http.routers.grafana.tls" = "true";
         "traefik.http.routers.grafana.middlewares" = "secure-headers@file";
         "traefik.http.services.grafana.loadbalancer.server.port" = "3000";
       };
@@ -216,6 +217,23 @@
     };
   };
 
+  # Generate Grafana env file from sops secret
+  systemd.services.grafana-env = {
+    description = "Generate Grafana environment file from secrets";
+    after = [ "sops-nix.service" ];
+    before = [ "docker-grafana.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "grafana-env" ''
+        mkdir -p /run/grafana
+        echo "GF_SECURITY_ADMIN_PASSWORD=$(cat ${config.sops.secrets."grafana-admin-password".path})" > /run/grafana/env
+        chmod 600 /run/grafana/env
+      '';
+    };
+  };
+
   # Generate postgres-exporter env file from sops secret
   systemd.services.postgres-exporter-env = {
     description = "Generate postgres-exporter environment file from secrets";
@@ -238,8 +256,8 @@
     docker-prometheus.after = [ "docker-network-monitoring-net.service" ];
     docker-prometheus.requires = [ "docker-network-monitoring-net.service" ];
 
-    docker-grafana.after = [ "docker-network-monitoring-net.service" "docker-network-proxy-net.service" ];
-    docker-grafana.requires = [ "docker-network-monitoring-net.service" "docker-network-proxy-net.service" ];
+    docker-grafana.after = [ "docker-network-monitoring-net.service" "docker-network-proxy-net.service" "grafana-env.service" ];
+    docker-grafana.requires = [ "docker-network-monitoring-net.service" "docker-network-proxy-net.service" "grafana-env.service" ];
 
     # Connect Grafana to proxy-net after creation (oci-containers only supports one --network)
     docker-grafana.postStart = "${pkgs.docker}/bin/docker network connect proxy-net grafana 2>/dev/null || true";
@@ -254,7 +272,7 @@
     docker-node-exporter.after = [ "docker-network-monitoring-net.service" ];
     docker-node-exporter.requires = [ "docker-network-monitoring-net.service" ];
 
-    docker-postgres-exporter.after = [ "docker-network-monitoring-net.service" ];
-    docker-postgres-exporter.requires = [ "docker-network-monitoring-net.service" ];
+    docker-postgres-exporter.after = [ "docker-network-monitoring-net.service" "postgres-exporter-env.service" ];
+    docker-postgres-exporter.requires = [ "docker-network-monitoring-net.service" "postgres-exporter-env.service" ];
   };
 }
