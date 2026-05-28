@@ -69,6 +69,7 @@
 
       "family-archive/database-password" = {
         owner = "root";
+        restartUnits = [ "db-passwords.service" "family-archive-env.service" "docker-family-archive.service" ];
       };
 
       "family-archive/s3-bucket" = {
@@ -99,6 +100,7 @@
       # home-cooking app secrets
       "home-cooking/database-password" = {
         owner = "root";
+        restartUnits = [ "db-passwords.service" "home-cooking-env.service" "docker-home-cooking.service" ];
       };
     };
   };
