@@ -46,16 +46,24 @@
     ];
   };
 
-  security.sudo.extraRules = [{
-    users = [ "deploy" ];
-    commands = [
-      { command = "/run/current-system/sw/bin/nixos-rebuild *"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/systemctl restart *"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/systemctl start *"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/systemctl stop *"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/systemctl status *"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/nix-collect-garbage *"; options = [ "NOPASSWD" ]; }
-      { command = "${config.services.postgresql.package}/bin/psql *"; options = [ "NOPASSWD" ]; runAs = "postgres"; }
-    ];
-  }];
+  security.sudo.extraRules = [
+    {
+      users = [ "deploy" ];
+      commands = [
+        { command = "/run/current-system/sw/bin/nixos-rebuild *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/systemctl restart *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/systemctl start *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/systemctl stop *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/systemctl status *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/nix-collect-garbage *"; options = [ "NOPASSWD" ]; }
+      ];
+    }
+    {
+      users = [ "deploy" ];
+      runAs = "postgres";
+      commands = [
+        { command = "${config.services.postgresql.package}/bin/psql *"; options = [ "NOPASSWD" ]; }
+      ];
+    }
+  ];
 }
