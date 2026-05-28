@@ -12,6 +12,7 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 NIXOS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DEPLOY_DIR="/var/lib/deploy"
 
 usage() {
   echo "Usage: $0 <app-name> <new-image-sha>"
@@ -29,6 +30,7 @@ usage() {
 APP_NAME="$1"
 NEW_SHA="$2"
 APP_FILE="$NIXOS_DIR/apps/$APP_NAME.nix"
+SHA_FILE="$DEPLOY_DIR/$APP_NAME.sha"
 
 [[ ! -f "$APP_FILE" ]] && error "App file not found: $APP_FILE"
 
@@ -37,10 +39,11 @@ APP_FILE="$NIXOS_DIR/apps/$APP_NAME.nix"
 
 info "Updating $APP_NAME to $NEW_SHA"
 
-# Replace the imageSha value in the app's nix file
-sed -i "s|imageSha = \"sha256:[a-f0-9]*\"|imageSha = \"$NEW_SHA\"|" "$APP_FILE"
+# Write SHA to state file
+sudo mkdir -p "$DEPLOY_DIR"
+echo -n "$NEW_SHA" | sudo tee "$SHA_FILE" > /dev/null
 
-info "Updated $APP_FILE"
+info "Updated $SHA_FILE"
 
 # Reset any previous failure state so the container can start fresh
 sudo systemctl reset-failed "docker-${APP_NAME}" 2>/dev/null || true

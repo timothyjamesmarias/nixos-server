@@ -3,7 +3,7 @@
 let
   appName  = "home-cooking";
   domain   = "home-cooking.timothymarias.com";
-  imageSha = "sha256:0000000000000000000000000000000000000000000000000000000000000000"; # Updated by CI
+  imageSha = builtins.replaceStrings ["\n"] [""] (builtins.readFile /var/lib/deploy/${appName}.sha);
   ghOrg    = "timothyjamesmarias";
   appPort  = "8080";
 in

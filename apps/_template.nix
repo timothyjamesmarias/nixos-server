@@ -3,14 +3,20 @@
 #
 # Checklist for adding a new app:
 #   1. Copy this file to apps/<your-app>.nix
-#   2. Fill in appName, domain, imageSha, and GitHub org below
+#   2. Fill in appName, domain, and GitHub org below
 #   3. Add environment variables and secrets (see comments below)
 #   4. Add a database entry to modules/postgresql.nix (appDatabases list):
 #        { name = "my-app"; user = "my_app"; dbName = "my_app"; }
 #   5. Add app secrets to secrets/secrets.yaml (and declare them in modules/secrets.nix):
 #        - my-app/database-password (required — set automatically on rebuild)
 #   6. Import the new file in configuration.nix
-#   7. Deploy: nixos-rebuild switch --flake ~/nixos-server#server
+#   7. Create the initial SHA file on the server:
+#        sudo mkdir -p /var/lib/deploy
+#        echo -n "sha256:<digest>" | sudo tee /var/lib/deploy/my-app.sha
+#   8. Deploy: nixos-rebuild switch --flake ~/nixos-server#server
+#
+# Image SHAs are stored in /var/lib/deploy/<app-name>.sha on the server,
+# updated by the deploy script. They are not tracked in git.
 #
 # Database passwords are set automatically from sops secrets on every rebuild.
 # No manual psql or PgBouncer restarts needed.
@@ -29,7 +35,7 @@
 let
   appName  = "my-app";       # TODO: container and router name (kebab-case)
   domain   = "my-app.example.com"; # TODO: any domain/subdomain you control
-  imageSha = "sha256:0000000000000000000000000000000000000000000000000000000000000000"; # Updated by CI
+  imageSha = builtins.replaceStrings ["\n"] [""] (builtins.readFile /var/lib/deploy/${appName}.sha);
   ghOrg    = "timothyjamesmarias";
   appPort  = "8080";         # Port the app listens on inside the container
 in
