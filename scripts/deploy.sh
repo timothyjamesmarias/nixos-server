@@ -42,8 +42,53 @@ sed -i "s|imageSha = \"sha256:[a-f0-9]*\"|imageSha = \"$NEW_SHA\"|" "$APP_FILE"
 
 info "Updated $APP_FILE"
 
+# Reset any previous failure state so the container can start fresh
+sudo systemctl reset-failed "docker-${APP_NAME}" 2>/dev/null || true
+
 info "Rebuilding NixOS configuration..."
 sudo nixos-rebuild switch --flake "$NIXOS_DIR#server"
 
-info "Deploy complete. Verifying container status..."
+info "Waiting for container to start..."
+MAX_WAIT=30
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+  STATUS=$(docker ps --filter "name=$APP_NAME" --format "{{.Status}}" 2>/dev/null || true)
+  if [[ -n "$STATUS" ]]; then
+    break
+  fi
+  sleep 1
+  WAITED=$((WAITED + 1))
+done
+
+if [[ -z "$STATUS" ]]; then
+  echo ""
+  error "Container $APP_NAME failed to start within ${MAX_WAIT}s. Recent logs:
+$(sudo journalctl -u "docker-${APP_NAME}" -n 15 --no-pager 2>/dev/null || echo 'Could not read logs')"
+fi
+
+info "Container running: $STATUS"
+
+# Health check — try the /health endpoint if Traefik labels are configured
+DOMAIN=$(grep -oP 'domain\s*=\s*"\K[^"]+' "$APP_FILE" 2>/dev/null || true)
+if [[ -n "$DOMAIN" ]]; then
+  info "Checking health at https://${DOMAIN}/health ..."
+  HEALTH_WAIT=15
+  HEALTH_OK=false
+  for i in $(seq 1 $HEALTH_WAIT); do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/health" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" ]]; then
+      HEALTH_OK=true
+      break
+    fi
+    sleep 1
+  done
+
+  if $HEALTH_OK; then
+    info "Health check passed (HTTP 200)"
+  else
+    warn "Health check failed (last HTTP $HTTP_CODE) — container is running but may not be routable yet"
+  fi
+fi
+
+info "Deploy complete."
 docker ps --filter "name=$APP_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
