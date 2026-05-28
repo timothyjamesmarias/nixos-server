@@ -10,13 +10,14 @@ Declarative NixOS configuration for a self-hosted server running Kotlin/Ktor bac
 
 ```bash
 # Build and apply configuration (run on the server)
-sudo nixos-rebuild switch --flake .#server
+# --impure is required because app configs read image digests from /var/lib/deploy/ at eval time
+sudo nixos-rebuild switch --flake .#server --impure
 
 # Dry-run to preview changes without applying
-nixos-rebuild dry-activate --flake .#server
+nixos-rebuild dry-activate --flake .#server --impure
 
 # Build only (check for evaluation errors)
-nixos-rebuild build --flake .#server
+nixos-rebuild build --flake .#server --impure
 
 # Evaluate a specific config value
 nix eval .#nixosConfigurations.server.config.networking.hostName

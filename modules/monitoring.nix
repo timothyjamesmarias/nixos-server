@@ -106,25 +106,8 @@
   };
 
   # --- Grafana provisioning ---
-
-  environment.etc."grafana/provisioning/datasources/datasources.yaml".text = builtins.toJSON {
-    apiVersion = 1;
-    datasources = [
-      {
-        name = "Prometheus";
-        type = "prometheus";
-        access = "proxy";
-        url = "http://prometheus:9090";
-        isDefault = true;
-      }
-      {
-        name = "Loki";
-        type = "loki";
-        access = "proxy";
-        url = "http://loki:3100";
-      }
-    ];
-  };
+  # Written to /run/grafana/provisioning by the grafana-env service (not environment.etc,
+  # because Docker can't follow NixOS /etc symlinks into the Nix store)
 
   # --- Containers ---
 
@@ -146,7 +129,7 @@
       image = "grafana/grafana@sha256:8b37a2f028f164ce7b9889e1765b9d6ee23fec80f871d156fbf436d6198d32b7";
       volumes = [
         "grafana-data:/var/lib/grafana"
-        "/etc/grafana/provisioning:/etc/grafana/provisioning:ro"
+        "/run/grafana/provisioning:/etc/grafana/provisioning:ro"
       ];
       environment = {
         GF_SECURITY_ADMIN_USER = "admin";
@@ -217,9 +200,30 @@
     };
   };
 
-  # Generate Grafana env file from sops secret
-  systemd.services.grafana-env = {
-    description = "Generate Grafana environment file from secrets";
+  # Generate Grafana env file and provisioning config
+  # Provisioning is written here (not environment.etc) because Docker can't follow
+  # NixOS symlinks inside a bind-mounted directory.
+  systemd.services.grafana-env = let
+    datasourcesConfig = pkgs.writeText "grafana-datasources.yaml" (builtins.toJSON {
+      apiVersion = 1;
+      datasources = [
+        {
+          name = "Prometheus";
+          type = "prometheus";
+          access = "proxy";
+          url = "http://prometheus:9090";
+          isDefault = true;
+        }
+        {
+          name = "Loki";
+          type = "loki";
+          access = "proxy";
+          url = "http://loki:3100";
+        }
+      ];
+    });
+  in {
+    description = "Generate Grafana environment and provisioning files";
     after = [ "sops-nix.service" ];
     before = [ "docker-grafana.service" ];
     wantedBy = [ "multi-user.target" ];
@@ -227,9 +231,14 @@
       Type = "oneshot";
       RemainAfterExit = true;
       ExecStart = pkgs.writeShellScript "grafana-env" ''
-        mkdir -p /run/grafana
+        mkdir -p /run/grafana/provisioning/datasources
+
+        # Admin password
         echo "GF_SECURITY_ADMIN_PASSWORD=$(cat ${config.sops.secrets."grafana-admin-password".path})" > /run/grafana/env
         chmod 600 /run/grafana/env
+
+        # Datasource provisioning (copy from Nix store to a real path Docker can read)
+        cp ${datasourcesConfig} /run/grafana/provisioning/datasources/datasources.yaml
       '';
     };
   };

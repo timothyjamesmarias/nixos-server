@@ -140,8 +140,10 @@ grep -rn "TODO" --include="*.nix"
 Before applying anything, test that the config evaluates:
 
 ```bash
-nixos-rebuild build --flake .#server
+nixos-rebuild build --flake .#server --impure
 ```
+
+> **Why `--impure`?** App configs use `builtins.readFile` to read image digests from `/var/lib/deploy/` at evaluation time. This requires `--impure` since it accesses paths outside the flake.
 
 **Review the config carefully before switching.** In particular, verify:
 - Port 22 is in `firewall.nix` `allowedTCPPorts` (or you will lose SSH access)
@@ -163,7 +165,7 @@ Clone and apply:
 ```bash
 git clone git@github.com:YOU/nixos-server.git ~/nixos-server
 sudo ln -sfn ~/nixos-server /etc/nixos/nixos-server
-sudo nixos-rebuild switch --flake ~/nixos-server#server
+sudo nixos-rebuild switch --flake ~/nixos-server#server --impure
 ```
 
 ### 7. Verify
@@ -274,7 +276,7 @@ monitoring-net   ← Prometheus, Grafana, Loki, OTel Collector
 8. Deploy:
 
 ```bash
-cd ~/nixos-server && sudo nixos-rebuild switch --flake ~/nixos-server#server
+cd ~/nixos-server && sudo nixos-rebuild switch --flake ~/nixos-server#server --impure
 ```
 
 ## Operations
@@ -286,7 +288,7 @@ cd ~/nixos-server && sudo nixos-rebuild switch --flake ~/nixos-server#server
 ./scripts/deploy.sh <app-name> <sha256:digest>
 
 # Manual: edit the imageSha in apps/<name>.nix, then rebuild
-sudo nixos-rebuild switch --flake ~/nixos-server#server
+sudo nixos-rebuild switch --flake ~/nixos-server#server --impure
 
 # Rollback
 sudo nixos-rebuild switch --rollback
@@ -344,7 +346,7 @@ systemctl status postgresql
 systemctl status pgbouncer
 
 # Rebuild errors
-nixos-rebuild build --flake ~/nixos-server#server   # build without applying
+nixos-rebuild build --flake ~/nixos-server#server --impure   # build without applying
 
 # Check all failed services
 sudo systemctl --failed

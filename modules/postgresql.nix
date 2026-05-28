@@ -111,6 +111,7 @@ in
   };
 
   # Generate PgBouncer auth file from PostgreSQL password hashes
+  # Reload PgBouncer after so it picks up new credentials immediately
   systemd.services.pgbouncer-auth = {
     description = "Generate PgBouncer userlist.txt from pg_shadow";
     after = [ "postgresql.service" "db-passwords.service" ];
@@ -131,6 +132,10 @@ in
         ${pkgs.sudo}/bin/sudo -u postgres ${psql} -Atf ${sqlFile} > /run/pgbouncer-auth/userlist.txt
         chmod 640 /run/pgbouncer-auth/userlist.txt
         chgrp pgbouncer /run/pgbouncer-auth/userlist.txt
+        # Reload PgBouncer to pick up new auth file
+        if systemctl is-active --quiet pgbouncer.service; then
+          systemctl reload pgbouncer.service
+        fi
       '';
     };
   };
@@ -147,7 +152,7 @@ in
         default_pool_size = 20;
         min_pool_size = 5;
 
-        listen_addr = "0.0.0.0";
+        listen_addr = "127.0.0.1,172.17.0.1";
         listen_port = 6432;
 
         auth_type = "scram-sha-256";
