@@ -34,12 +34,16 @@
     openssl
   ];
 
+  # Declarative user management — passwords are set from sops on every rebuild
+  users.mutableUsers = false;
+
   # Root password from sops (safety net for manual administration)
   users.users.root.hashedPasswordFile = config.sops.secrets."root-password".path;
 
-  # Deploy user — used for SSH access and managing containers
+  # Deploy user — SSH key auth only, no password
   users.users.deploy = {
     isNormalUser = true;
+    hashedPassword = "!";
     extraGroups = [ "docker" ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJvpe/fxnamo6zzOVoxK3WfouV1LyIrd5JCHXvfyH+v timmarias@Tims-MacBook-Pro.local"
