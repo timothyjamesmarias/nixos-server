@@ -155,6 +155,7 @@ in
 
         auth_type = "scram-sha-256";
         auth_file = "/run/pgbouncer-auth/userlist.txt";
+        ignore_startup_parameters = "extra_float_digits";
       };
 
       databases = lib.listToAttrs ((map (app: {

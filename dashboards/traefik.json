@@ -94,23 +94,6 @@
         },
         "overrides": []
       }
-    },
-    {
-      "id": 5,
-      "title": "Open Connections",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "traefik_entrypoint_open_connections{job=\"traefik\"}",
-          "legendFormat": "{{ entrypoint }} - {{ method }}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      }
     }
   ]
 }
