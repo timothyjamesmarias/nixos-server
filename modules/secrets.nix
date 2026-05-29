@@ -27,10 +27,12 @@
 
       "grafana-admin-password" = {
         owner = "root";
+        restartUnits = [ "grafana-env.service" "docker-grafana.service" ];
       };
 
       "postgres-exporter-dsn" = {
         owner = "root";
+        restartUnits = [ "postgres-exporter-env.service" "docker-postgres-exporter.service" ];
       };
 
       "auth-service/jwt-secret" = {
