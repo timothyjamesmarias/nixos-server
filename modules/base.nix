@@ -60,7 +60,11 @@
         { command = "/run/current-system/sw/bin/systemctl start *"; options = [ "NOPASSWD" ]; }
         { command = "/run/current-system/sw/bin/systemctl stop *"; options = [ "NOPASSWD" ]; }
         { command = "/run/current-system/sw/bin/systemctl status *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/systemctl reset-failed *"; options = [ "NOPASSWD" ]; }
         { command = "/run/current-system/sw/bin/nix-collect-garbage *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/mkdir *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/tee *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/journalctl *"; options = [ "NOPASSWD" ]; }
       ];
     }
     {
