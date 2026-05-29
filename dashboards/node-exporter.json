@@ -1,0 +1,155 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "uid": "node-exporter",
+  "title": "Node Exporter - System Metrics",
+  "tags": ["node-exporter", "system"],
+  "editable": true,
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Uptime",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "node_time_seconds{job=\"node-exporter\"} - node_boot_time_seconds{job=\"node-exporter\"}",
+          "legendFormat": "Uptime"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "1 - avg(rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"}[5m]))",
+          "legendFormat": "CPU Used"
+        },
+        {
+          "expr": "avg(rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"}[5m]))",
+          "legendFormat": "CPU Idle"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemAvailable_bytes{job=\"node-exporter\"}",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "node_memory_MemAvailable_bytes{job=\"node-exporter\"}",
+          "legendFormat": "Available"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Disk Usage (/)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "node_filesystem_size_bytes{job=\"node-exporter\", mountpoint=\"/\"} - node_filesystem_avail_bytes{job=\"node-exporter\", mountpoint=\"/\"}",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "node_filesystem_avail_bytes{job=\"node-exporter\", mountpoint=\"/\"}",
+          "legendFormat": "Available"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Network I/O",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total{job=\"node-exporter\", device!=\"lo\"}[5m])",
+          "legendFormat": "Receive {{ device }}"
+        },
+        {
+          "expr": "-rate(node_network_transmit_bytes_total{job=\"node-exporter\", device!=\"lo\"}[5m])",
+          "legendFormat": "Transmit {{ device }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Load Average",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "node_load1{job=\"node-exporter\"}",
+          "legendFormat": "1m"
+        },
+        {
+          "expr": "node_load5{job=\"node-exporter\"}",
+          "legendFormat": "5m"
+        },
+        {
+          "expr": "node_load15{job=\"node-exporter\"}",
+          "legendFormat": "15m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}

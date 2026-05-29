@@ -210,6 +210,7 @@
         {
           name = "Prometheus";
           type = "prometheus";
+          uid = "prometheus";
           access = "proxy";
           url = "http://prometheus:9090";
           isDefault = true;
@@ -217,11 +218,27 @@
         {
           name = "Loki";
           type = "loki";
+          uid = "loki";
           access = "proxy";
           url = "http://loki:3100";
         }
       ];
     });
+    dashboardProvisioningConfig = pkgs.writeText "grafana-dashboards.yaml" (builtins.toJSON {
+      apiVersion = 1;
+      providers = [
+        {
+          name = "default";
+          orgId = 1;
+          folder = "";
+          type = "file";
+          disableDeletion = false;
+          updateIntervalSeconds = 60;
+          options.path = "/etc/grafana/provisioning/dashboards/json";
+        }
+      ];
+    });
+    dashboardsDir = ../dashboards;
   in {
     description = "Generate Grafana environment and provisioning files";
     after = [ "sops-nix.service" ];
@@ -232,13 +249,18 @@
       RemainAfterExit = true;
       ExecStart = pkgs.writeShellScript "grafana-env" ''
         mkdir -p /run/grafana/provisioning/datasources
+        mkdir -p /run/grafana/provisioning/dashboards/json
 
         # Admin password
         echo "GF_SECURITY_ADMIN_PASSWORD=$(cat ${config.sops.secrets."grafana-admin-password".path})" > /run/grafana/env
         chmod 600 /run/grafana/env
 
-        # Datasource provisioning (copy from Nix store to a real path Docker can read)
+        # Datasource provisioning
         cp ${datasourcesConfig} /run/grafana/provisioning/datasources/datasources.yaml
+
+        # Dashboard provisioning
+        cp ${dashboardProvisioningConfig} /run/grafana/provisioning/dashboards/dashboards.yaml
+        cp ${dashboardsDir}/*.json /run/grafana/provisioning/dashboards/json/
       '';
     };
   };

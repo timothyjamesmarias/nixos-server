@@ -1,0 +1,101 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "uid": "app-overview",
+  "title": "App Overview - OTel Metrics",
+  "tags": ["app", "otel"],
+  "editable": true,
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests / s by Service",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (service_name)",
+          "legendFormat": "{{ service_name }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Latency p50 / p95 / p99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (le, service_name))",
+          "legendFormat": "{{ service_name }} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (le, service_name))",
+          "legendFormat": "{{ service_name }} p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (le, service_name))",
+          "legendFormat": "{{ service_name }} p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Error Rate by Service (5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-collector\", namespace=\"otel\", status_code=~\"5..\"}[5m])) by (service_name) / sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (service_name)",
+          "legendFormat": "{{ service_name }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Active Requests by Service",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(otel_http_server_active_requests{job=\"otel-collector\", namespace=\"otel\"}) by (service_name)",
+          "legendFormat": "{{ service_name }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}
