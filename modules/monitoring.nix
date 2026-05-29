@@ -30,6 +30,10 @@
         job_name = "otel-collector";
         static_configs = [{ targets = [ "otel-collector:8888" ]; }];
       }
+      {
+        job_name = "otel-apps";
+        static_configs = [{ targets = [ "otel-collector:8889" ]; }];
+      }
     ];
   };
 
@@ -63,6 +67,11 @@
     };
 
     service = {
+      telemetry = {
+        metrics = {
+          address = "0.0.0.0:8888";
+        };
+      };
       pipelines = {
         metrics = {
           receivers = [ "otlp" ];

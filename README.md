@@ -60,7 +60,7 @@ These go in `secrets/secrets.yaml` (encrypted). See `secrets/secrets.example.yam
 | **`origin-cert-pem`** | Cloudflare Origin CA certificate (public) | Cloudflare → SSL/TLS → Origin Server → Create Certificate |
 | **`origin-cert-key`** | Cloudflare Origin CA private key | Generated with the cert above — save it, Cloudflare won't show it again |
 | **`grafana-admin-password`** | Grafana web UI login | Choose a password |
-| **`postgres-exporter-dsn`** | Prometheus monitoring of PostgreSQL | `postgresql://postgres_exporter:<password>@localhost:5432/postgres?sslmode=disable` |
+| **`postgres-exporter-dsn`** | Prometheus monitoring of PostgreSQL | `postgresql://postgres_exporter:<password>@host.docker.internal:6432/postgres?sslmode=disable` |
 | **`auth-service/jwt-secret`** | JWT signing for the auth ForwardAuth service | Generate with `openssl rand -hex 32` |
 
 ## Setup Steps

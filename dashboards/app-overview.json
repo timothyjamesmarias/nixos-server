@@ -21,7 +21,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (service_name)",
+          "expr": "sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-apps\"}[5m])) by (service_name)",
           "legendFormat": "{{ service_name }}"
         }
       ],
@@ -40,15 +40,15 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (le, service_name))",
+          "expr": "histogram_quantile(0.50, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-apps\"}[5m])) by (le, service_name))",
           "legendFormat": "{{ service_name }} p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (le, service_name))",
+          "expr": "histogram_quantile(0.95, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-apps\"}[5m])) by (le, service_name))",
           "legendFormat": "{{ service_name }} p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (le, service_name))",
+          "expr": "histogram_quantile(0.99, sum(rate(otel_http_server_request_duration_seconds_bucket{job=\"otel-apps\"}[5m])) by (le, service_name))",
           "legendFormat": "{{ service_name }} p99"
         }
       ],
@@ -67,7 +67,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-collector\", namespace=\"otel\", status_code=~\"5..\"}[5m])) by (service_name) / sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-collector\", namespace=\"otel\"}[5m])) by (service_name)",
+          "expr": "sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-apps\", http_status_code=~\"5..\"}[5m])) by (service_name) / sum(rate(otel_http_server_request_duration_seconds_count{job=\"otel-apps\"}[5m])) by (service_name)",
           "legendFormat": "{{ service_name }}"
         }
       ],
@@ -88,7 +88,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(otel_http_server_active_requests{job=\"otel-collector\", namespace=\"otel\"}) by (service_name)",
+          "expr": "sum(otel_http_server_active_requests{job=\"otel-apps\"}) by (service_name)",
           "legendFormat": "{{ service_name }}"
         }
       ],
