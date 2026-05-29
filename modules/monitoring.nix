@@ -177,11 +177,12 @@
       volumes = [
         "/proc:/host/proc:ro"
         "/sys:/host/sys:ro"
+        "/:/host/rootfs:ro"
       ];
       cmd = [
         "--path.procfs=/host/proc"
         "--path.sysfs=/host/sys"
-        "--no-collector.filesystem"
+        "--path.rootfs=/host/rootfs"
       ];
       extraOptions = [
         "--network=monitoring-net"
